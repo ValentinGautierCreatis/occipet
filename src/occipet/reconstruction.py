@@ -6,7 +6,8 @@ import astra
 import numpy as np
 
 
-def create_projector(shape: tuple[int, int], angles: np.ndarray, gpu: int) -> int:
+def create_projector(shape: tuple[int, int],
+                     angles: np.ndarray, gpu: int) -> int:
     """ Create a projector for the given geometry
 
     :param shape: shape of the images in 2D
@@ -21,7 +22,7 @@ def create_projector(shape: tuple[int, int], angles: np.ndarray, gpu: int) -> in
     vol_geom = astra.create_vol_geom(shape)
     proj_geom = astra.create_proj_geom("parallel", 1.0, max(shape), angles)
 
-    if gpu==None:
+    if gpu is None:
         projector_id = astra.create_projector('line', proj_geom, vol_geom)
     else:
         projector_id = astra.create_projector('cuda', proj_geom, vol_geom)
@@ -39,15 +40,17 @@ def div_zer(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     :returns: elementwise a/b
 
     """
-    assert a.shape==b.shape, "both matrix should be the same size"
+    assert a.shape == b.shape, "both matrix should be the same size"
     epsilon = 10**(-12)
-    size=a.shape
-    new=np.zeros(size)
-    new=a/(b+epsilon)
+    size = a.shape
+    new = np.zeros(size)
+    new = a/(b+epsilon)
     return new
 
-    
-def forward_projection(x: np.ndarray, projector_id: int, gpu: int = None) -> tuple[int, np.ndarray]:
+
+def forward_projection(x: np.ndarray,
+                       projector_id: int, gpu: int = None
+                       ) -> tuple[int, np.ndarray]:
     """ Forward projection using astra
 
     :param x: data on which is applied the forward projection
@@ -59,10 +62,11 @@ def forward_projection(x: np.ndarray, projector_id: int, gpu: int = None) -> tup
     :returns: the forward projection of x
 
     """
-    return astra.creators.create_sino(x,projector_id,gpuIndex=gpu)
+    return astra.creators.create_sino(x, projector_id, gpuIndex=gpu)
 
 
-def back_projection(y: np.ndarray, projector_id: int) -> tuple[int, np.ndarray]:
+def back_projection(y: np.ndarray, projector_id: int
+                    ) -> tuple[int, np.ndarray]:
     """ Back projection using astra
 
     :param y: data on which is applied the retroprojection
@@ -72,10 +76,11 @@ def back_projection(y: np.ndarray, projector_id: int) -> tuple[int, np.ndarray]:
     :returns: the retroprojection of y
 
     """
-    return astra.creators.create_backprojection(y,projector_id)
+    return astra.creators.create_backprojection(y, projector_id)
 
 
-def MLEM(y: np.ndarray, image_shape: np.ndarray, nb_iterations: int, projector_id: int) -> np.ndarray:
+def MLEM(y: np.ndarray, image_shape: np.ndarray,
+         nb_iterations: int, projector_id: int) -> np.ndarray:
     """ MLEM implementation using astra
 
     :param y: sinogram to reconstruct
@@ -91,7 +96,8 @@ def MLEM(y: np.ndarray, image_shape: np.ndarray, nb_iterations: int, projector_i
     """
     image = np.ones(image_shape)
     _, norm = back_projection(np.ones(y.shape), projector_id)
-    assert norm.shape==image_shape, "The image shape is different from the one specified by the projector"
+    assert norm.shape == image_shape, \
+        "The image shape is different from the one specified by the projector"
 
     for _ in range(nb_iterations):
         _, ybar = forward_projection(image, projector_id)

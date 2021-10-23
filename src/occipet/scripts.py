@@ -1,7 +1,11 @@
-from .load_data import load_mnc
+"""
+Collection of scripts that can be used to automate tasks.
+"""
+
 import matplotlib.pyplot as plt
-from .reconstruction import MLEM, forward_projection, create_projector
 import numpy as np
+from .reconstruction import MLEM, forward_projection, create_projector
+from .load_data import load_mnc
 
 
 def show_slice(path: str, slice_id: int) -> None:
@@ -15,9 +19,10 @@ def show_slice(path: str, slice_id: int) -> None:
 
     """
     data = load_mnc(path)
-    assert 0<slice_id<data.shape[0], f"{slice_id} is not a valid slice id"
+    assert 0 < slice_id < data.shape[0], f"{slice_id} is not a valid slice id"
     plt.imshow(data[slice_id, :, :], cmap="gray")
     plt.show()
+
 
 def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
 
@@ -34,11 +39,11 @@ def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
     # Parameters
     angles = np.arange(0, 2*np.pi, 0.05)
     nb_iterations = 200
-    bkgEventRatio = 0.2
+    bkg_event_ratio = 0.2
 
     # Load data
     data = load_mnc(anatomical)
-    assert 0<slice_id<data.shape[0], f"{slice_id} is not a valid slice id"
+    assert 0 < slice_id < data.shape[0], f"{slice_id} is not a valid slice id"
     image = data[slice_id, :, :]
 
     # Making PET phantom
@@ -55,7 +60,8 @@ def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
     projector_id = create_projector(pet_phantom.shape, angles, None)
 
     _, proj = forward_projection(pet_phantom, projector_id)
-    r = (1/(1/bkgEventRatio - 1))*np.ones(proj.shape)*np.sum(proj)/np.sum(np.ones(proj.shape))
+    r = (1/(1/bkg_event_ratio - 1))*np.ones(proj.shape)\
+        * np.sum(proj)/np.sum(np.ones(proj.shape))
 
     y_nonoise = proj + r
     y = np.random.poisson(y_nonoise)
