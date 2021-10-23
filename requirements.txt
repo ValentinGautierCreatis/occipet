@@ -1,0 +1,15 @@
+astra-toolbox==1.8b5
+click==8.0.3
+cycler==0.10.0
+Cython==0.29.24
+kiwisolver==1.3.2
+matplotlib==3.4.3
+nibabel==3.2.1
+numpy==1.21.2
+packaging==21.0
+Pillow==8.4.0
+pyparsing==2.4.7
+python-dateutil==2.8.2
+scipy==1.7.1
+six==1.16.0
+typer==0.4.0
