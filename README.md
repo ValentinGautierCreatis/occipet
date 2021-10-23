@@ -24,7 +24,7 @@ Finally, just install the library by running the following at the root of the re
 pip install .
 ```
 
-You can install it in development mode. Changes in the source files while be applied without having to install 
+You can install it in development mode. Changes in the source files will be applied without having to install 
 the package again. To do so, run the following :
 
 ``` sh
