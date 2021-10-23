@@ -1,4 +1,4 @@
-# OccipeAlterna
+# Occipet
 
 Occipet is a python package I have built to have several customizable tools to work with medical images. 
 It is a library that can be used as a building block in other python scripts. It also exposes several 
