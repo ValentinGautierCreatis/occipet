@@ -20,6 +20,7 @@ def create_projector(shape: tuple[int, int],
 
     """
     vol_geom = astra.create_vol_geom(shape)
+    # TODO check this max(shape) and see if we can get the shape from this
     proj_geom = astra.create_proj_geom("parallel", 1.0, max(shape), angles)
 
     if gpu is None:
