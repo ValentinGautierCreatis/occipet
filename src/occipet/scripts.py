@@ -4,7 +4,7 @@ Collection of scripts that can be used to automate tasks.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from .reconstruction import MLEM, forward_projection, create_projector
+from .reconstruction import MLEM, forward_projection, create_projector, EMTV
 from .load_data import load_mnc
 
 
@@ -68,7 +68,7 @@ def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
 
     # PET reconstruction
 
-    x_recon = MLEM(y, pet_phantom.shape, nb_iterations, projector_id)
+    x_recon = EMTV(y, pet_phantom.shape, nb_iterations, projector_id)
 
     plt.imshow(x_recon, cmap="gray")
     plt.show()
