@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .reconstruction import MLEM, forward_projection, create_projector, EMTV
 from .load_data import load_mnc
+from matplotlib.widgets import Slider
 
 
 def show_slice(path: str, slice_id: int) -> None:
@@ -19,8 +20,23 @@ def show_slice(path: str, slice_id: int) -> None:
 
     """
     data = load_mnc(path)
-    assert 0 < slice_id < data.shape[0], f"{slice_id} is not a valid slice id"
-    plt.imshow(data[slice_id, :, :], cmap="gray")
+    fig, ax = plt.subplots()
+    plt.subplots_adjust(left=0.25, bottom=0.25)
+    slice_id = 0
+    image = plt.imshow(data[slice_id, :, :], cmap="gray")
+
+    ax_color = 'lightgoldenrodyellow'
+    ax_slice = plt.axes([0.25,0.1,0.65,0.03], facecolor=ax_color)
+
+    slider_slice = Slider(ax_slice, 'ID slice', 0, data.shape[0] - 1, valinit=slice_id, valstep=1)
+
+    def update(val):
+        slice_id = slider_slice.val
+        image.set_data(data[slice_id, :, :])
+        fig.canvas.draw_idle()
+
+    slider_slice.on_changed(update)
+    # assert 0 <= slice_id < data.shape[0], f"{slice_id} is not a valid slice id"
     plt.show()
 
 
