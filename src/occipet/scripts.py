@@ -47,7 +47,7 @@ def show_slice(path: str, slice_id: int) -> None:
     plt.show()
 
 
-def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
+def generate_pet_phantom(anatomical: str, slice_id: int, regularization: float) -> None:
 
     """ Generate a PET phantom from an anatomical mnc image
 
@@ -55,11 +55,11 @@ def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
     :type anatomical: str
     :param slice_id: Id of the slice we want to display
     :type slice_id: int
+    :param regularization: amount of TV regularization to be applied
     :returns: None
 
     """
-
-    # Parameters
+     # Parameters
     angles = np.arange(0, 2*np.pi, 0.05)
     nb_iterations = 200
     bkg_event_ratio = 0.2
@@ -91,7 +91,10 @@ def generate_pet_phantom(anatomical: str, slice_id: int) -> None:
 
     # PET reconstruction
 
-    x_recon = EMTV(y, pet_phantom.shape, nb_iterations, projector_id)
+    if regularization == 0:
+        x_recon = MLEM(y, pet_phantom.shape, nb_iterations, projector_id)
+    else:
+        x_recon = EMTV(y, pet_phantom.shape, nb_iterations, projector_id, regularization)
 
     plt.imshow(x_recon, cmap="gray")
     plt.show()

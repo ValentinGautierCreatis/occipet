@@ -3,7 +3,7 @@ Module enabling scripts to be run in the command line. Functions defined
 here are Typer wrapper around scripts from the file "scripts.py"
 """
 
-from typer import Typer
+from typer import Typer, Option
 from .scripts import show_slice, generate_pet_phantom
 
 app = Typer()
@@ -24,14 +24,15 @@ def show_slice_wrapper(path: str, slice_id: int) -> None:
 
 
 @app.command("generate_pet_phantom")
-def generate_pet_phantom_wrapper(anatomical: str, slice_id: int):
+def generate_pet_phantom_wrapper(anatomical: str, slice_id: int, regularization: float = Option(0)):
     """ Generate a PET phantom from an anatomical mnc image
 
     :param anatomical: Path to the original anatomical image
     :type anatomical: str
     :param slice_id: Id of the slice we want to display
     :type slice_id: int
+    :param regularization: amount of TV regularization to be applied
     :returns: None
 
     """
-    generate_pet_phantom(anatomical, slice_id)
+    generate_pet_phantom(anatomical, slice_id, regularization)
