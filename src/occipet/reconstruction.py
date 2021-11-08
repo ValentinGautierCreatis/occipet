@@ -110,6 +110,65 @@ def MLEM(y: np.ndarray, image_shape: np.ndarray,
     return image
 
 
+
+def gradient(a) :
+    '''
+    Compute gradient of a
+
+    Parameters
+    ----------
+    a : cp.array
+        data
+
+    Returns
+    -------
+    grad : cp.array
+           gradient(a)
+    '''
+    dim = len(a.shape)
+    if dim == 2 :
+        grad = np.zeros((dim,a.shape[0],a.shape[1]))
+        grad[0] = np.diff(a,1,axis=0,append=a[-1,:].reshape(1,a.shape[1]))
+        grad[1] = np.diff(a,1,axis=1,append=a[:,-1].reshape(a.shape[0],1))
+    elif dim == 3 :
+        grad = np.zeros((3,a.shape[0],a.shape[1],a.shape[2]))
+        grad[0] = np.diff(a,1,axis=0,append=a[-1,:,:].reshape(1,a.shape[1],a.shape[2]))
+        grad[1] = np.diff(a,1,axis=1,append=a[:,-1,:].reshape(a.shape[0],1,a.shape[2]))
+        grad[2] = np.diff(a,1,axis=2,append=a[:,:,-1].reshape(a.shape[0],a.shape[1],1))
+    else:
+        raise IndexError("Unvalid dimension for a. Must be 2 or 3")
+    return grad
+
+
+def gradient_div(a) :
+    '''
+    Compute gradient of a used in divergence
+
+    Parameters
+    ----------
+    a : cp.array
+        data
+
+    Returns
+    -------
+    grad : cp.array
+           gradient(a)
+    '''
+    dim = len(a.shape)
+    if dim == 2 :
+        grad = np.zeros((2,a.shape[0],a.shape[1]))
+        grad[0] = np.diff(a,1,axis=0,prepend=a[0,:].reshape(1,a.shape[1]))
+        grad[1] = np.diff(a,1,axis=1,prepend=a[:,0].reshape(a.shape[0],1))
+    elif dim == 3 :
+        grad = np.zeros((3,a.shape[0],a.shape[1],a.shape[2]))
+        grad[0] = np.diff(a,1,axis=0,prepend=a[0,:,:].reshape(1,a.shape[1],a.shape[2]))
+        grad[1] = np.diff(a,1,axis=1,prepend=a[:,0,:].reshape(a.shape[0],1,a.shape[2]))
+        grad[2] = np.diff(a,1,axis=2,prepend=a[:,:,0].reshape(a.shape[0],a.shape[1],1))
+    else:
+        raise IndexError("Unvalid dimension for a. Must be 2 or 3")
+    return grad
+
+
 def div_2d(q: list) -> np.ndarray:
     """ Computes the divergence of a 2D vector field
 
@@ -118,8 +177,8 @@ def div_2d(q: list) -> np.ndarray:
     :returns: The divergence of this vector field represented as a 2D ndarray.
 
     """
-    grad1=np.gradient(q[0])
-    grad2=np.gradient(q[1])
+    grad1=gradient_div(q[0])
+    grad2=gradient_div(q[1])
     return grad1[0]+grad2[1]
 
 
@@ -169,7 +228,7 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
         for _ in range(175):
             #phi_int=[g[0],g[1]]
             div=div_2d(g)
-            grad=np.gradient(wn*div-image)
+            grad=gradient(wn*div-image)
             denom=1+tau*np.sqrt(grad[0]**2+grad[1]**2)
             g[0]=(g[0]+tau*grad[0])/denom
             g[1]=(g[1]+tau*grad[1])/denom
