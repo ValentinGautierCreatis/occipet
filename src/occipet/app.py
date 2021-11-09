@@ -24,7 +24,7 @@ def show_slice_wrapper(path: str, slice_id: int) -> None:
 
 
 @app.command("generate_pet_phantom")
-def generate_pet_phantom_wrapper(anatomical: str, slice_id: int, regularization: float = Option(0)):
+def generate_pet_phantom_wrapper(anatomical: str, slice_id: int, regularization: float = Option(0), gpu: int = Option(None)) -> None:
     """ Generate a PET phantom from an anatomical mnc image
 
     :param anatomical: Path to the original anatomical image
@@ -32,7 +32,8 @@ def generate_pet_phantom_wrapper(anatomical: str, slice_id: int, regularization:
     :param slice_id: Id of the slice we want to display
     :type slice_id: int
     :param regularization: amount of TV regularization to be applied
+    :param gpu: index of gpu to be used
     :returns: None
 
     """
-    generate_pet_phantom(anatomical, slice_id, regularization)
+    generate_pet_phantom(anatomical, slice_id, regularization, gpu)

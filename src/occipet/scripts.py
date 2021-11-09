@@ -47,7 +47,7 @@ def show_slice(path: str, slice_id: int) -> None:
     plt.show()
 
 
-def generate_pet_phantom(anatomical: str, slice_id: int, regularization: float) -> None:
+def generate_pet_phantom(anatomical: str, slice_id: int, regularization: float, gpu: int=None) -> None:
 
     """ Generate a PET phantom from an anatomical mnc image
 
@@ -80,7 +80,7 @@ def generate_pet_phantom(anatomical: str, slice_id: int, regularization: float) 
     pet_phantom[image == 9] = 0
 
     # Generate PET scanner data
-    projector_id = create_projector(pet_phantom.shape, angles, None)
+    projector_id = create_projector(pet_phantom.shape, angles, gpu)
 
     _, proj = forward_projection(pet_phantom, projector_id)
     r = (1/(1/bkg_event_ratio - 1))*np.ones(proj.shape)\
