@@ -80,6 +80,29 @@ def back_projection(y: np.ndarray, projector_id: int
     return astra.creators.create_backprojection(y, projector_id)
 
 
+def em_step(y: np.ndarray, image: np.ndarray,
+            projector_id: int, norm: np.ndarray) -> np.ndarray:
+
+    """Implements one step of expectation maximization
+
+    :param y: Sinogram to reconstruct
+    :type y: np.ndarray
+    :param image: The current estimate of the image to reconstruct
+    :type image: np.ndarray
+    :param projector_id: id of the projector for this sinogram
+    :type projector_id: int
+    :param norm: Normalization factor for the geometry of this sinogram
+    :type norm: np.ndarray
+    :returns: Updated estimate of the image to reconstruct
+
+    """
+    _, ybar = forward_projection(image, projector_id)
+    ratio = div_zer(y, ybar)
+    _, update = back_projection(ratio, projector_id)
+    update = div_zer(update, norm)
+    return image * update
+
+
 def MLEM(y: np.ndarray, image_shape: np.ndarray,
          nb_iterations: int, projector_id: int) -> np.ndarray:
     """ MLEM implementation using astra
@@ -101,13 +124,8 @@ def MLEM(y: np.ndarray, image_shape: np.ndarray,
         "The image shape is different from the one specified by the projector"
 
     for _ in range(nb_iterations):
-        _, ybar = forward_projection(image, projector_id)
-        ratio = div_zer(y, ybar)
-        _, update = back_projection(ratio, projector_id)
-        update = div_zer(update, norm)
-        image = image * update
-
-    return image
+        image = em_step(y, image, projector_id, norm)
+    return image[1:-1,:]
 
 
 
@@ -214,11 +232,7 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
         norm=np.max(wn)
 
         #computing lambda(n+1/2) with a EM step
-        _, ybar = forward_projection(image, projector_id)
-        ratio = div_zer(y, ybar)
-        _, update = back_projection(ratio, projector_id)
-        update = div_zer(update, s)
-        image = image * update
+        image = em_step(y, image, projector_id, s)
 
         tau = 1/(4*norm)
 
@@ -234,4 +248,4 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
             g[1]=(g[1]+tau*grad[1])/denom
 
         image=image-wn*div_2d(g)
-    return image
+    return image[1:-1, :]
