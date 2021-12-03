@@ -6,46 +6,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .reconstruction import MLEM, forward_projection, create_projector, EMTV
 from .load_data import load_mnc
-from matplotlib.widgets import Slider
+from .visualization import show_array
 
 
-def show_slice(path: str, slice_id: int) -> None:
+def show_slice(path: str, slice_id: int, axis: int) -> None:
     """ Take an mnc data as input and display the wanted slice.
 
     :param path: Path to input mnc file
     :type path: str
     :param slice_id: Id of the slice we want to display
     :type slice_id: int
+    :param axis: axis on which the slider is applied
     :returns: None
 
     """
     # Loading data and checking
     data = load_mnc(path)
-    assert 0 <= slice_id < data.shape[0], \
+    assert 0 <= slice_id < data.shape[axis], \
         "f{slice_id} is not a valid slice ID"
+    assert 0 <= axis < len(data.shape)
 
-    # Defining the plot
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left=0.25, bottom=0.25)
-    image = ax.imshow(data[slice_id, :, :], cmap="gray")
-
-
-    # Defining the slider
-    ax_color = 'lightgoldenrodyellow'
-    ax_slice = plt.axes([0.25,0.1,0.65,0.03], facecolor=ax_color)
-
-    slider_slice = Slider(ax_slice, 'ID slice', 0, data.shape[0] - 1, valinit=slice_id, valstep=1)
-
-    # Update function for the plot
-    def update(val):
-        slice_id = slider_slice.val
-        image.set_data(data[slice_id, :, :])
-        fig.canvas.draw_idle()
-
-    # Ploting
-    slider_slice.on_changed(update)
-    plt.show()
-
+    show_array(data, slice_id, axis)
 
 def generate_pet_phantom(anatomical: str, slice_id: int, regularization: float, gpu: int=None) -> None:
 

@@ -10,17 +10,19 @@ app = Typer()
 
 
 @app.command("show_slice")
-def show_slice_wrapper(path: str, slice_id: int) -> None:
+def show_slice_wrapper(path: str, slice_id: int,
+                       axis: int = Option(0, "--axis", "-a")) -> None:
     """ Take an mnc data as input and display the wanted slice.
 
     :param path: Path to input mnc file
     :type path: str
     :param slice_id: Id of the slice we want to display
     :type slice_id: int
+    :param axis: axis on which the slider is applied
     :returns: None
 
     """
-    show_slice(path, slice_id)
+    show_slice(path, slice_id, axis)
 
 
 @app.command("generate_pet_phantom")
