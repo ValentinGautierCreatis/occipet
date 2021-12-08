@@ -2,9 +2,11 @@
 Defines basic functions for image reconstruction from sinogram.
 """
 
-import astra
 import numpy as np
 from .utils import *
+from scipy.sparse.linalg import cg, LinearOperator
+from scipy.fft import ifft2
+from functools import partial
 
 
 def em_step(y: np.ndarray, image: np.ndarray,
@@ -28,6 +30,42 @@ def em_step(y: np.ndarray, image: np.ndarray,
     _, update = back_projection(ratio, projector_id)
     update = div_zer(update, norm)
     return image * update
+
+
+def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
+                      rho: float, z_k: np.ndarray,
+                      gamma_k: np.ndarray, projector_id: int) -> np.ndarray:
+
+    _, norm = back_projection(np.ones(y.shape,), projector_id)
+    nabla_u = gradient(image)
+    penalty_term = rho * div_2d(list(nabla_u - z_k + (gamma_k/rho)) )
+    denominator = norm + penalty_term
+
+    _,ybar = back_projection(image, projector_id)
+    ratio = div_zer(y, ybar)
+    _, update = back_projection(ratio, projector_id)
+    update = div_zer(update, denominator)
+    return image*update
+
+
+def merhanian_mr_step(
+        s: np.ndarray, rho: float, z_k: np.ndarray,
+        gamma_k: np.ndarray) -> np.ndarray:
+
+    b = ifft2(s) + div_2d(list(rho * z_k - gamma_k))
+    A = LinearOperator((2,2), matvec=partial(merhanian_A_matrix, rho))
+
+    return cg(A, b)
+
+
+def merhanian_constraint_step(correcting_z, comodal_z, sigma,
+                              lambd, rho):
+
+    norm_vector = generalized_l2_norm_squared(np.array([correcting_z, comodal_z]))
+    omega = np.exp(-sigma * norm_vector)
+    update_factor = max(0, norm_vector - (lambd/rho)*omega)/norm_vector
+
+    return correcting_z* update_factor
 
 
 def MLEM(y: np.ndarray, image_shape: np.ndarray,
@@ -104,3 +142,53 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
 
         image=image-wn*div_2d(g)
     return image[1:-1, :]
+
+
+def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
+                           pet_number_iterations, mr_number_iterations,
+                           number_iterations,
+                           pet_data, mr_data, pet_shape, mr_shape,
+                           projector_id):
+
+    # Initialization
+    u = np.ones(pet_shape)
+    v = np.ones(mr_shape)
+    gamma_u = np.array(u, copy=True)
+    gamma_v = np.array(v, copy=True)
+
+    for _ in range(number_iterations):
+
+        z_u = gradient(u)
+        z_v = gradient(v)
+
+        # pet update
+        temp_u = np.array(u, copy=True)
+        for _ in range(pet_number_iterations):
+            temp_u = merhanian_pet_step(pet_data, temp_u, rho_u, z_u, gamma_u,
+                                        projector_id)
+        u = temp_u
+
+        # mr update
+        temp_v = np.array(v, copy=True)
+        for _ in range(mr_number_iterations):
+            temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v)
+        v = temp_v
+
+        # Constraint variable update
+        correcting_z_u = gradient(u) + gamma_u/rho_u
+        correcting_z_v = gradient(v) + gamma_v/rho_v
+
+        alpha_u = generalized_l2_norm_squared(z_v)/generalized_l2_norm_squared(z_u)
+        alpha_v = generalized_l2_norm_squared(z_u)/generalized_l2_norm_squared(z_v)
+
+        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, sigma,
+                                        lambda_u, rho_u)
+
+        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, sigma,
+                                        lambda_v, rho_v)
+
+        # Lagrange multiplier update
+        gamma_u = gamma_u + rho_u * (gradient(u) - z_u)
+        gamma_v = gamma_v + rho_v * (gradient(v) - z_v)
+
+    return u, v

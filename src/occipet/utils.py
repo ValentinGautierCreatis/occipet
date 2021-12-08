@@ -78,7 +78,7 @@ def back_projection(y: np.ndarray, projector_id: int
     return astra.creators.create_backprojection(y, projector_id)
 
 
-def gradient(a) :
+def gradient(a) -> np.ndarray :
     '''
     Compute gradient of a
 
@@ -147,3 +147,11 @@ def div_2d(q: list) -> np.ndarray:
     grad1=gradient_div(q[0])
     grad2=gradient_div(q[1])
     return grad1[0]+grad2[1]
+
+
+def merhanian_A_matrix(rho, image):
+    return rho * div_2d(list(gradient(image)))
+
+
+def generalized_l2_norm_squared(vector):
+    return np.sum(vector**2)
