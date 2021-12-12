@@ -41,21 +41,21 @@ def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
     penalty_term = rho * div_2d(list(nabla_u - z_k + (gamma_k/rho)) )
     denominator = norm + penalty_term
 
-    _,ybar = back_projection(image, projector_id)
+    _,ybar = forward_projection(image, projector_id)
     ratio = div_zer(y, ybar)
     _, update = back_projection(ratio, projector_id)
     update = div_zer(update, denominator)
     return image*update
 
-
+# TODO: shape of the linear operator (work with vector ?)
 def merhanian_mr_step(
         s: np.ndarray, rho: float, z_k: np.ndarray,
         gamma_k: np.ndarray) -> np.ndarray:
 
-    b = ifft2(s) + div_2d(list(rho * z_k - gamma_k))
-    A = LinearOperator((2,2), matvec=partial(merhanian_A_matrix, rho))
+    b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
+    A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
 
-    return cg(A, b)
+    return cg(A, b)[0].reshape(s.shape)
 
 
 def merhanian_constraint_step(correcting_z, comodal_z, sigma,
@@ -150,11 +150,13 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
                            pet_data, mr_data, pet_shape, mr_shape,
                            projector_id):
 
+
     # Initialization
+    epsilon = 10**(-12)
     u = np.ones(pet_shape)
     v = np.ones(mr_shape)
-    gamma_u = np.array(u, copy=True)
-    gamma_v = np.array(v, copy=True)
+    gamma_u = np.repeat(np.array([u], copy=True), 2, axis=0)
+    gamma_v = np.repeat(np.array([v], copy=True), 2, axis=0)
 
     for _ in range(number_iterations):
 
@@ -178,8 +180,8 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         correcting_z_u = gradient(u) + gamma_u/rho_u
         correcting_z_v = gradient(v) + gamma_v/rho_v
 
-        alpha_u = generalized_l2_norm_squared(z_v)/generalized_l2_norm_squared(z_u)
-        alpha_v = generalized_l2_norm_squared(z_u)/generalized_l2_norm_squared(z_v)
+        alpha_u = generalized_l2_norm_squared(z_v)/(generalized_l2_norm_squared(z_u) + epsilon)
+        alpha_v = generalized_l2_norm_squared(z_u)/(generalized_l2_norm_squared(z_v) + epsilon)
 
         z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, sigma,
                                         lambda_u, rho_u)

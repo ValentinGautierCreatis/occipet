@@ -94,7 +94,7 @@ def gradient(a) -> np.ndarray :
     '''
     dim = len(a.shape)
     if dim == 2 :
-        grad = np.zeros((dim,a.shape[0],a.shape[1]))
+        grad = np.zeros((dim,a.shape[0],a.shape[1]), dtype=a.dtype)
         grad[0] = np.diff(a,1,axis=0,append=a[-1,:].reshape(1,a.shape[1]))
         grad[1] = np.diff(a,1,axis=1,append=a[:,-1].reshape(a.shape[0],1))
     elif dim == 3 :
@@ -103,7 +103,7 @@ def gradient(a) -> np.ndarray :
         grad[1] = np.diff(a,1,axis=1,append=a[:,-1,:].reshape(a.shape[0],1,a.shape[2]))
         grad[2] = np.diff(a,1,axis=2,append=a[:,:,-1].reshape(a.shape[0],a.shape[1],1))
     else:
-        raise IndexError("Unvalid dimension for a. Must be 2 or 3")
+        raise IndexError(f"Unvalid dimension {dim} for a. Must be 2 or 3")
     return grad
 
 
@@ -123,7 +123,7 @@ def gradient_div(a) :
     '''
     dim = len(a.shape)
     if dim == 2 :
-        grad = np.zeros((2,a.shape[0],a.shape[1]))
+        grad = np.zeros((2,a.shape[0],a.shape[1]), dtype=a.dtype)
         grad[0] = np.diff(a,1,axis=0,prepend=a[0,:].reshape(1,a.shape[1]))
         grad[1] = np.diff(a,1,axis=1,prepend=a[:,0].reshape(a.shape[0],1))
     elif dim == 3 :
@@ -150,8 +150,13 @@ def div_2d(q: list) -> np.ndarray:
 
 
 def merhanian_A_matrix(rho, image):
-    return rho * div_2d(list(gradient(image)))
+    return image + rho * div_2d(list(gradient(image)))
 
+
+def A_matrix_from_flatten(shape_image, rho, flat_image):
+    image = flat_image.reshape(shape_image)
+    image = merhanian_A_matrix(rho, image)
+    return image.flatten()
 
 def generalized_l2_norm_squared(vector):
-    return np.sum(vector**2)
+    return np.sum(abs(vector)**2)
