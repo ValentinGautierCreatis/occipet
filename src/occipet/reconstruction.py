@@ -61,7 +61,7 @@ def merhanian_mr_step(
 def merhanian_constraint_step(correcting_z, comodal_z, sigma,
                               lambd, rho):
 
-    norm_vector = generalized_l2_norm_squared(np.array([correcting_z, comodal_z]))
+    norm_vector = np.sqrt(generalized_l2_norm_squared(np.array([correcting_z, comodal_z])))
     omega = np.exp(-sigma * norm_vector)
     update_factor = max(0, norm_vector - (lambd/rho)*omega)/norm_vector
 
@@ -180,8 +180,8 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         correcting_z_u = gradient(u) + gamma_u/rho_u
         correcting_z_v = gradient(v) + gamma_v/rho_v
 
-        alpha_u = generalized_l2_norm_squared(z_v)/(generalized_l2_norm_squared(z_u) + epsilon)
-        alpha_v = generalized_l2_norm_squared(z_u)/(generalized_l2_norm_squared(z_v) + epsilon)
+        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/np.sqrt((generalized_l2_norm_squared(z_u) + epsilon))
+        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/np.sqrt((generalized_l2_norm_squared(z_v) + epsilon))
 
         z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, sigma,
                                         lambda_u, rho_u)
