@@ -38,10 +38,9 @@ def generate_pet_data(data_file, noise_ratio, noise_sigma):
     raw_data = brainweb.load_file(data_file)
     pet, *_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
     pet = pet[slices]
-    pet_noisy = brainweb.noise(pet, noise_ratio, noise_sigma)
 
     angles = np.arange(0, 2*np.pi, 0.05)
-    projector_id = create_projector(pet_noisy.shape, angles, None)
-    _, proj = forward_projection(pet_noisy, projector_id)
+    projector_id = create_projector(pet.shape, angles, None)
+    _, proj = forward_projection(pet, projector_id)
 
-    return proj, pet, pet_noisy, projector_id
+    return np.random.poisson(proj), pet, projector_id
