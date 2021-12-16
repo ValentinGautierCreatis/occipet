@@ -58,14 +58,13 @@ def merhanian_mr_step(
     return cg(A, b)[0].reshape(s.shape)
 
 
-def merhanian_constraint_step(correcting_z, comodal_z, sigma,
+def merhanian_constraint_step(correcting_z, comodal_z, current_z, sigma,
                               lambd, rho):
 
-    norm_vector = np.sqrt(generalized_l2_norm_squared(np.array([correcting_z, comodal_z])))
-    omega = np.exp(-sigma * norm_vector)
-    update_factor = max(0, norm_vector - (lambd/rho)*omega)/norm_vector
-
-    return correcting_z* update_factor
+    norm_matrix = co_norm(correcting_z, comodal_z)
+    omega = np.exp(-sigma * co_norm(current_z, comodal_z))
+    update_matrix = div_zer((norm_matrix - (lambd/rho)*omega).clip(min=0), norm_matrix)
+    return multiply_along_0axis(update_matrix, correcting_z)
 
 
 def MLEM(y: np.ndarray, image_shape: np.ndarray,
@@ -183,10 +182,10 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/np.sqrt((generalized_l2_norm_squared(z_u) + epsilon))
         alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/np.sqrt((generalized_l2_norm_squared(z_v) + epsilon))
 
-        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, sigma,
+        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, z_u, sigma,
                                         lambda_u, rho_u)
 
-        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, sigma,
+        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, z_v, sigma,
                                         lambda_v, rho_v)
 
         # Lagrange multiplier update
