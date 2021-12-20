@@ -44,7 +44,7 @@ def generate_t1_mr_data(data_file, noise_ratio):
     return t1, noisy_signal
 
 
-def generate_pet_data(data_file, noise_ratio, noise_sigma):
+def generate_pet_data(data_file):
 
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
