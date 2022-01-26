@@ -28,7 +28,7 @@ def generate_t1_mr_data(data_file, noise_ratio):
     t1 = t1[slices]
     transformed_t1 = fftshift(fft2(t1))
 
-    signal_power = sum(abs(transformed_t1)**2)/transformed_t1.size
+    signal_power = np.sum(abs(transformed_t1)**2)/transformed_t1.size
     signal_power_db = 10*np.log10(signal_power)
 
     noise_power_db = signal_power_db - noise_ratio
