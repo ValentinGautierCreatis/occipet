@@ -3,6 +3,7 @@ Defines basic functions for image reconstruction from sinogram.
 """
 
 import numpy as np
+from numpy.fft import ifftshift
 from .utils import *
 from scipy.sparse.linalg import cg, LinearOperator
 from scipy.fft import ifft2
@@ -47,15 +48,15 @@ def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
     update = div_zer(update, denominator)
     return image*update
 
-# TODO: shape of the linear operator (work with vector ?)
+
 def merhanian_mr_step(
         s: np.ndarray, rho: float, z_k: np.ndarray,
-        gamma_k: np.ndarray) -> np.ndarray:
+        gamma_k: np.ndarray, nb_iterations: int) -> np.ndarray:
 
-    b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
+    b = ( ifft2(ifftshift(s)) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
     A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
 
-    return cg(A, b)[0].reshape(s.shape)
+    return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
 
 
 def merhanian_constraint_step(correcting_z, comodal_z, current_z, sigma,
@@ -154,8 +155,8 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
     epsilon = 10**(-12)
     u = np.ones(pet_shape)
     v = np.ones(mr_shape)
-    gamma_u = np.repeat(np.array([u], copy=True), 2, axis=0)
-    gamma_v = np.repeat(np.array([v], copy=True), 2, axis=0)
+    gamma_u = np.ones((len(pet_shape),) + pet_shape)
+    gamma_v = np.ones((len(mr_shape),) + mr_shape)
 
     for _ in range(number_iterations):
 
@@ -171,8 +172,7 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
 
         # mr update
         temp_v = np.array(v, copy=True)
-        for _ in range(mr_number_iterations):
-            temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v)
+        temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations)
         v = temp_v
 
         # Constraint variable update
@@ -193,3 +193,60 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         gamma_v = gamma_v + rho_v * (gradient(v) - z_v)
 
     return u, v
+
+
+def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
+                           pet_number_iterations, mr_number_iterations,
+                           number_iterations,
+                           pet_data, mr_data, pet_shape, mr_shape,
+                           projector_id,
+                           pet, mri):
+
+
+    # Initialization
+    points_pet = []
+    points_mri = []
+    epsilon = 10**(-12)
+    u = np.ones(pet_shape)
+    v = np.ones(mr_shape)
+    gamma_u = np.ones((len(pet_shape),) + pet_shape)
+    gamma_v = np.ones((len(mr_shape),) + mr_shape)
+
+    for i in range(number_iterations):
+
+        z_u = gradient(u)
+        z_v = gradient(v)
+
+        # pet update
+        temp_u = np.array(u, copy=True)
+        for _ in range(pet_number_iterations):
+            temp_u = merhanian_pet_step(pet_data, temp_u, rho_u, z_u, gamma_u,
+                                        projector_id)
+        u = temp_u
+
+        # mr update
+        temp_v = np.array(v, copy=True)
+        temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations)
+        v = temp_v
+
+        # Constraint variable update
+        correcting_z_u = gradient(u) + gamma_u/rho_u
+        correcting_z_v = gradient(v) + gamma_v/rho_v
+
+        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/np.sqrt((generalized_l2_norm_squared(z_u) + epsilon))
+        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/np.sqrt((generalized_l2_norm_squared(z_v) + epsilon))
+
+        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, z_u, sigma,
+                                        lambda_u, rho_u)
+
+        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, z_v, sigma,
+                                        lambda_v, rho_v)
+
+        # Lagrange multiplier update
+        gamma_u = gamma_u + rho_u * (gradient(u) - z_u)
+        gamma_v = gamma_v + rho_v * (gradient(v) - z_v)
+
+        points_pet.append(np.sum(abs(u-pet)))
+        points_mri.append(np.sum(abs(u-mri)))
+
+    return points_pet, points_mri, u, v

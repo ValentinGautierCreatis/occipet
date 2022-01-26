@@ -19,7 +19,7 @@ def create_projector(shape: tuple[int, int],
     """
     vol_geom = astra.create_vol_geom(shape)
     # TODO check this max(shape) and see if we can get the shape from this
-    proj_geom = astra.create_proj_geom("parallel", 1.0, max(shape), angles)
+    proj_geom = astra.create_proj_geom("parallel", 1, max(shape), angles)
 
     if gpu is None:
         projector_id = astra.create_projector('line', proj_geom, vol_geom)
@@ -135,6 +135,11 @@ def gradient_div(a) :
         raise IndexError("Unvalid dimension for a. Must be 2 or 3")
     return grad
 
+# def gradient(x):
+#     return np.array(np.gradient(x))
+
+# gradient_div = np.gradient
+
 
 def div_2d(q: list) -> np.ndarray:
     """ Computes the divergence of a 2D vector field
@@ -158,5 +163,20 @@ def A_matrix_from_flatten(shape_image, rho, flat_image):
     image = merhanian_A_matrix(rho, image)
     return image.flatten()
 
+
 def generalized_l2_norm_squared(vector):
     return np.sum(abs(vector)**2)
+
+
+def co_norm(u, v):
+    u_norm_squared = np.sum(abs(u)**2, axis=0)
+    v_norm_squared = np.sum(abs(v)**2, axis=0)
+    return np.sqrt(u_norm_squared+v_norm_squared)
+
+
+def multiply_along_0axis(multiplier, multiplied):
+
+    new = np.zeros(multiplied.shape, dtype=multiplied.dtype)
+    for k in range(multiplied.shape[0]):
+        new[k] = multiplier * multiplied[k]
+    return new
