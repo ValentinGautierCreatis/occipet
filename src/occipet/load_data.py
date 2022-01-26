@@ -5,7 +5,7 @@ Module used to load data
 import nibabel as nib
 import numpy as np
 import brainweb
-from scipy.fft import fft2, fftshift
+from scipy.fft import fft2
 from .utils import create_projector, forward_projection
 
 def load_mnc(path: str) -> np.ndarray:
@@ -26,7 +26,7 @@ def generate_t1_mr_data(data_file, noise_ratio):
     raw_data = brainweb.load_file(data_file)
     _,_,t1,_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
     t1 = t1[slices]
-    transformed_t1 = fftshift(fft2(t1))
+    transformed_t1 = fft2(t1)
 
     signal_power = np.sum(abs(transformed_t1)**2)/transformed_t1.size
     signal_power_db = 10*np.log10(signal_power)

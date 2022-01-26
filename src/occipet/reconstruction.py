@@ -3,7 +3,6 @@ Defines basic functions for image reconstruction from sinogram.
 """
 
 import numpy as np
-from numpy.fft import ifftshift
 from .utils import *
 from scipy.sparse.linalg import cg, LinearOperator
 from scipy.fft import ifft2
@@ -53,7 +52,7 @@ def merhanian_mr_step(
         s: np.ndarray, rho: float, z_k: np.ndarray,
         gamma_k: np.ndarray, nb_iterations: int) -> np.ndarray:
 
-    b = ( ifft2(ifftshift(s)) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
+    b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
     A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
 
     return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
@@ -212,7 +211,7 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
     gamma_u = np.ones((len(pet_shape),) + pet_shape)
     gamma_v = np.ones((len(mr_shape),) + mr_shape)
 
-    for i in range(number_iterations):
+    for _ in range(number_iterations):
 
         z_u = gradient(u)
         z_v = gradient(v)
