@@ -43,16 +43,32 @@ def generate_t1_mr_data(data_file, noise_ratio):
 
     return t1, noisy_signal
 
+def generate_t1_mr_data_sigma(data_file, noise_ratio):
+    slices = (80,slice(120,230),slice(120,230))
+    raw_data = brainweb.load_file(data_file)
+    _,_,t1,_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
+    t1 = t1[slices]
 
-def generate_pet_data(data_file):
+    sigma = noise_ratio * np.amax(t1)
+    noise = np.random.normal(0, sigma, t1.shape)
+
+    noisy_signal = fft2(t1 + noise)
+
+    return t1, noisy_signal, sigma
+
+
+def generate_pet_data(data_file, background_event_ratio):
 
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
     pet, *_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
-    pet = pet[slices]
+    pet = pet[slices]/10
 
     angles = np.arange(0, 2*np.pi, 0.05)
     projector_id = create_projector(pet.shape, angles, None)
     _, proj = forward_projection(pet, projector_id)
+    r = (1/(1/background_event_ratio - 1)) * np.ones(proj.shape) * np.sum(proj) / np.sum(np.ones(proj.shape))
+
+    proj = proj + r
 
     return np.random.poisson(proj), pet, projector_id
