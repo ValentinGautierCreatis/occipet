@@ -5,7 +5,7 @@ Defines basic functions for image reconstruction from sinogram.
 import numpy as np
 from .utils import *
 from scipy.sparse.linalg import cg, LinearOperator
-from scipy.fft import ifft2
+from scipy.fft import ifft2, fft2
 from functools import partial
 
 
@@ -33,13 +33,13 @@ def em_step(y: np.ndarray, image: np.ndarray,
 
 
 def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
-                      rho: float, z_k: np.ndarray,
-                      gamma_k: np.ndarray, projector_id: int) -> np.ndarray:
+                       rho: float, z_k: np.ndarray,
+                       gamma_k: np.ndarray, projector_id: int) -> np.ndarray:
 
     _, norm = back_projection(np.ones(y.shape,), projector_id)
     nabla_u = gradient(image)
     penalty_term = rho * div_2d(list(nabla_u - z_k + (gamma_k/rho)) )
-    denominator = norm + penalty_term
+    denominator = norm - penalty_term
 
     _,ybar = forward_projection(image, projector_id)
     ratio = div_zer(y, ybar)
@@ -48,12 +48,23 @@ def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
     return image*update
 
 
+# def merhanian_mr_step(
+#         s: np.ndarray, rho: float, z_k: np.ndarray,
+#         gamma_k: np.ndarray, nb_iterations: int) -> np.ndarray:
+
+#     b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
+#     A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
+
+#     return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
+
+
 def merhanian_mr_step(
         s: np.ndarray, rho: float, z_k: np.ndarray,
-        gamma_k: np.ndarray, nb_iterations: int) -> np.ndarray:
+        gamma_k: np.ndarray, nb_iterations: int,
+        W: np.ndarray) -> np.ndarray:
 
-    b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
-    A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
+    b = ( ifft2(W * s) - div_2d(list(rho * z_k - gamma_k)) ).flatten()
+    A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho, W))
 
     return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
 
@@ -199,19 +210,22 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
                            number_iterations,
                            pet_data, mr_data, pet_shape, mr_shape,
                            projector_id,
-                           pet, mri):
+                           pet, mri, W):
 
 
     # Initialization
-    points_pet = []
-    points_mri = []
+    list_keys = ["reconstruction_error", "joint_tv", "data_fidelity", "alpha", "froebenius"]
+    points_pet = dict((k, list()) for k in list_keys)
+    points_mri = dict((k, list()) for k in list_keys)
+
     epsilon = 10**(-12)
     u = np.ones(pet_shape)
-    v = np.ones(mr_shape)
+    # v = np.ones(mr_shape)
+    v = np.zeros(mr_shape)
     gamma_u = np.ones((len(pet_shape),) + pet_shape)
     gamma_v = np.ones((len(mr_shape),) + mr_shape)
 
-    for _ in range(number_iterations):
+    for i in range(number_iterations):
 
         z_u = gradient(u)
         z_v = gradient(v)
@@ -224,28 +238,38 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         u = temp_u
 
         # mr update
-        temp_v = np.array(v, copy=True)
-        temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations)
-        v = temp_v
+        v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations, W)
 
         # Constraint variable update
         correcting_z_u = gradient(u) + gamma_u/rho_u
         correcting_z_v = gradient(v) + gamma_v/rho_v
 
-        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/np.sqrt((generalized_l2_norm_squared(z_u) + epsilon))
-        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/np.sqrt((generalized_l2_norm_squared(z_v) + epsilon))
+        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/(np.sqrt(generalized_l2_norm_squared(z_u)) + epsilon)
+        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/(np.sqrt(generalized_l2_norm_squared(z_v)) + epsilon)
 
-        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, z_u, sigma,
+        temp_z_u = merhanian_constraint_step(correcting_z_u, alpha_v * z_v, z_u, sigma,
                                         lambda_u, rho_u)
 
-        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, z_v, sigma,
+        z_v = merhanian_constraint_step(correcting_z_v, alpha_u * z_u, z_v, sigma,
                                         lambda_v, rho_v)
+
+        z_u = temp_z_u
 
         # Lagrange multiplier update
         gamma_u = gamma_u + rho_u * (gradient(u) - z_u)
         gamma_v = gamma_v + rho_v * (gradient(v) - z_v)
 
-        points_pet.append(np.sum(abs(u-pet)))
-        points_mri.append(np.sum(abs(u-mri)))
+
+        points_pet["reconstruction_error"].append(np.sum(abs(u-pet)))
+        points_pet["joint_tv"].append(np.sum(co_norm(z_u, alpha_v * z_v)))
+        points_pet["data_fidelity"].append(data_fidelity_pet(u, pet_data, projector_id))
+        points_pet["alpha"].append(alpha_u)
+        points_pet["froebenius"].append(generalized_l2_norm_squared(z_u))
+
+        points_mri["reconstruction_error"].append(np.sum(abs(v-mri)))
+        points_mri["joint_tv"].append(np.sum(co_norm(alpha_u * z_u, z_v)))
+        points_mri["data_fidelity"].append(data_fidelity_mri(v, mr_data, W))
+        points_mri["alpha"].append(alpha_v)
+        points_mri["froebenius"].append(generalized_l2_norm_squared(z_v))
 
     return points_pet, points_mri, u, v

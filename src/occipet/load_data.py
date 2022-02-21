@@ -49,10 +49,10 @@ def generate_t1_mr_data_sigma(data_file, noise_ratio):
     _,_,t1,_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
     t1 = t1[slices]
 
-    sigma = noise_ratio * np.amax(t1)
-    noise = np.random.normal(0, sigma, t1.shape)
-
-    noisy_signal = fft2(t1 + noise)
+    signal = fft2(t1)
+    sigma = noise_ratio * np.amax(abs(signal))
+    noise = np.random.normal(0, sigma, signal.shape)
+    noisy_signal = signal + noise/10
 
     return t1, noisy_signal, sigma
 

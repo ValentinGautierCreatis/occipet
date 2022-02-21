@@ -2,7 +2,7 @@
 
 import astra
 import numpy as np
-
+from scipy.fft import fft2, ifft2
 
 def create_projector(shape: tuple[int, int],
                      angles: np.ndarray, gpu: int) -> int:
@@ -43,7 +43,9 @@ def div_zer(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     epsilon = 10**(-12)
     size = a.shape
     new = np.zeros(size)
-    new = a/(b+epsilon)
+    non_zero = (b != 0)
+    new[non_zero] = a[non_zero]/b[non_zero]
+    # new = a/(b+epsilon)
     return new
 
 
@@ -154,13 +156,13 @@ def div_2d(q: list) -> np.ndarray:
     return grad1[0]+grad2[1]
 
 
-def merhanian_A_matrix(rho, image):
-    return image + rho * div_2d(list(gradient(image)))
+def merhanian_A_matrix(rho, W, image):
+    return ifft2(W * fft2(image)) - rho * div_2d(list(gradient(image)))
 
 
-def A_matrix_from_flatten(shape_image, rho, flat_image):
+def A_matrix_from_flatten(shape_image, rho, W, flat_image):
     image = flat_image.reshape(shape_image)
-    image = merhanian_A_matrix(rho, image)
+    image = merhanian_A_matrix(rho, W, image)
     return image.flatten()
 
 
@@ -180,3 +182,15 @@ def multiply_along_0axis(multiplier, multiplied):
     for k in range(multiplied.shape[0]):
         new[k] = multiplier * multiplied[k]
     return new
+
+
+def data_fidelity_pet(image, data, projector_id):
+    _, projected_image = forward_projection(image, projector_id)
+    intermediate = projected_image - data * np.log(projected_image)
+    return np.sum(intermediate)
+
+
+def data_fidelity_mri(image, data, W):
+    projected_image = fft2(image)
+    intermediate = W*abs(projected_image - data)**2
+    return np.sum(intermediate)
