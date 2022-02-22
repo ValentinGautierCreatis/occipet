@@ -220,7 +220,6 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
 
     epsilon = 10**(-12)
     u = np.ones(pet_shape)
-    # v = np.ones(mr_shape)
     v = np.zeros(mr_shape)
     gamma_u = np.ones((len(pet_shape),) + pet_shape)
     gamma_v = np.ones((len(mr_shape),) + mr_shape)
