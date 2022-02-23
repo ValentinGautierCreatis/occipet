@@ -5,6 +5,7 @@ Module used to load data
 import nibabel as nib
 import numpy as np
 import brainweb
+import pydicom
 from scipy.fft import fft2
 from .utils import create_projector, forward_projection
 
@@ -97,3 +98,14 @@ def generate_pet_data(data_file: str, background_event_ratio: float,
     return pet, np.random.poisson(proj), projector_id
 
 
+def get_image_from_dicom(path: str) -> np.ndarray:
+
+    """Get image from dicom file
+
+    :param path: path of the file
+    :type path: str
+    :returns: the read image
+
+    """
+    data = pydicom.dcmread(path)
+    return data.pixel_array
