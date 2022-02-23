@@ -156,41 +156,123 @@ def div_2d(q: list) -> np.ndarray:
     return grad1[0]+grad2[1]
 
 
-def merhanian_A_matrix(rho, W, image):
+def merhanian_A_matrix(rho: float, W: float, image: np.ndarray) -> np.ndarray:
+    """Computes de effect of the A matrix of the system in equation (21)
+    on a given input vector
+
+    :param rho: parameter rho_v
+    :type rho: float
+    :param W: noise
+    :type W: float
+    :param image: current image
+    :type image: np.ndarray
+    :returns: the image on which we have applied the A matrix
+
+    """
     return ifft2(W * fft2(image)) - rho * div_2d(list(gradient(image)))
 
 
-def A_matrix_from_flatten(shape_image, rho, W, flat_image):
+def A_matrix_from_flatten(shape_image: np.ndarray, rho: float,
+                          W: float, flat_image: np.ndarray) -> np.ndarray:
+    """Takes the input image as a vector and compute the effect of the A
+    matrix of the system in equation (21)
+
+    :param shape_image: shape of the image
+    :type shape_image: np.ndarray
+    :param rho: parameter rho_v
+    :type rho: float
+    :param W: noise
+    :type W: float
+    :param flat_image: the flattened image
+    :type flat_image: np.ndarray
+    :returns: the flattened image on which we have applied the A matrix
+
+    """
     image = flat_image.reshape(shape_image)
     image = merhanian_A_matrix(rho, W, image)
     return image.flatten()
 
 
-def generalized_l2_norm_squared(vector):
+def generalized_l2_norm_squared(vector: np.ndarray) -> float:
+    """Squared Froebenius norm of the input
+
+    :param vector: input vector/matrix
+    :type vector: np.ndarray
+    :returns: the Froebenius norm
+
+    """
     return np.sum(abs(vector)**2)
 
 
-def co_norm(u, v):
+def co_norm(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Computes the co norm of two gradient like objects on each voxel/pixel
+    equation (7) of Merhanian's paper
+
+    :param u: gradient like object
+    :type u: np.ndarray
+    :param v: gradient like object
+    :type v: np.ndarray
+    :returns: A matrix representing the co norm computed on each voxel
+
+    """
     u_norm_squared = np.sum(abs(u)**2, axis=0)
     v_norm_squared = np.sum(abs(v)**2, axis=0)
     return np.sqrt(u_norm_squared+v_norm_squared)
 
 
-def multiply_along_0axis(multiplier, multiplied):
+def multiply_along_0axis(multiplier: np.ndarray, multiplied: np.ndarray
+                         ) -> np.ndarray:
 
+    """Take a matrix and multiply each element of an array of matrix of same
+    dimension by this matrix
+
+    :param multiplier: the matrix to use as a multiplier
+    :type multiplier: np.ndarray
+    :param multiplied: array of matrix to be multiplied
+    :type multiplied: np.ndarray
+    :returns: np array of same dimensions as multiplied.
+
+    """
     new = np.zeros(multiplied.shape, dtype=multiplied.dtype)
     for k in range(multiplied.shape[0]):
         new[k] = multiplier * multiplied[k]
     return new
 
 
-def data_fidelity_pet(image, data, projector_id):
+def data_fidelity_pet(image: np.ndarray, data: np.ndarray, projector_id: int
+                      ) -> float:
+    """Compute the data fidelity term for pet data as in
+    equation (5) of Merhanian's paper
+
+
+    :param image: image we want to check the data fidelity of
+    :type image: np.ndarray
+    :param data: reference projections data
+    :type data: np.ndarray
+    :param projector_id: id of the projector to be used
+    :type projector_id: int
+    :returns: the data fidelity term
+
+    """
     _, projected_image = forward_projection(image, projector_id)
     intermediate = projected_image - data * np.log(projected_image)
     return np.sum(intermediate)
 
 
-def data_fidelity_mri(image, data, W):
+def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float
+                      ) -> float:
+    """Compute the data fidelity term for mri data as in
+    equation (6) of Merhanian's paper
+
+    :param image: image we want to check the data fidelity of
+    :type image: np.ndarray
+    :param data: reference projections data
+    :type data: np.ndarray
+    :param W: noise
+    :type W: float
+    :returns: the data fidelity term
+
+    """
     projected_image = fft2(image)
     intermediate = W*abs(projected_image - data)**2
     return np.sum(intermediate)

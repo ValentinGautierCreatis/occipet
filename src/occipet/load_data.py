@@ -21,6 +21,9 @@ def load_mnc(path: str) -> np.ndarray:
 
 
 def generate_t1_mr_data(data_file, noise_ratio):
+    """
+    deprecated
+    """
 
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
@@ -43,7 +46,17 @@ def generate_t1_mr_data(data_file, noise_ratio):
 
     return t1, noisy_signal
 
-def generate_t1_mr_data_sigma(data_file, noise_ratio):
+def generate_t1_mr_data_sigma(data_file: str, noise_ratio: float
+                              ):
+    """generates noisy mri data from brainweb data file
+
+    :param data_file: brainweb datafile
+    :type data_file: np.ndarray
+    :param noise_ratio: ratio of noise on the projection data
+    :type noise_ratio: float
+    :returns: the original image, the noisy_projections and the added noise
+
+    """
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
     _,_,t1,_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
@@ -57,18 +70,30 @@ def generate_t1_mr_data_sigma(data_file, noise_ratio):
     return t1, noisy_signal, sigma
 
 
-def generate_pet_data(data_file, background_event_ratio):
+def generate_pet_data(data_file: str, background_event_ratio: float,
+                      angles_step: float = 0.05):
 
+    """generates noisy pet data from brainweb data file
+
+    :param data_file: brainweb datafile
+    :type data_file: str
+    :param background_event_ratio: ratio of background event noise to add
+    :type background_event_ratio: float
+    :returns:  the original image, the noisy data and the projector for these data
+
+    """
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
     pet, *_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
     pet = pet[slices]/10
 
-    angles = np.arange(0, 2*np.pi, 0.05)
+    angles = np.arange(0, 2*np.pi, angles_step)
     projector_id = create_projector(pet.shape, angles, None)
     _, proj = forward_projection(pet, projector_id)
     r = (1/(1/background_event_ratio - 1)) * np.ones(proj.shape) * np.sum(proj) / np.sum(np.ones(proj.shape))
 
     proj = proj + r
 
-    return np.random.poisson(proj), pet, projector_id
+    return pet, np.random.poisson(proj), projector_id
+
+

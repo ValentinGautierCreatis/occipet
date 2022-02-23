@@ -36,6 +36,25 @@ def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
                        rho: float, z_k: np.ndarray,
                        gamma_k: np.ndarray, projector_id: int) -> np.ndarray:
 
+    """One step of PET update for Merhanian algorithm as
+    in equation (20)
+
+    :param y: pet projections
+    :type y: np.ndarray
+    :param image: current image
+    :type image: np.ndarray
+    :param rho: parameter rho_u
+    :type rho: float
+    :param z_k: current z_u
+    :type z_k: np.ndarray
+    :param gamma_k: current gamma_u
+    :type gamma_k: np.ndarray
+    :param projector_id: id of the projector to be used
+    :type projector_id: int
+    :returns: The updated pet image
+
+    """
+
     _, norm = back_projection(np.ones(y.shape,), projector_id)
     nabla_u = gradient(image)
     penalty_term = rho * div_2d(list(nabla_u - z_k + (gamma_k/rho)) )
@@ -48,30 +67,61 @@ def merhanian_pet_step(y: np.ndarray, image: np.ndarray,
     return image*update
 
 
-# def merhanian_mr_step(
-#         s: np.ndarray, rho: float, z_k: np.ndarray,
-#         gamma_k: np.ndarray, nb_iterations: int) -> np.ndarray:
-
-#     b = ( ifft2(s) + div_2d(list(rho * z_k - gamma_k)) ).flatten()
-#     A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho))
-
-#     return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
-
-
 def merhanian_mr_step(
         s: np.ndarray, rho: float, z_k: np.ndarray,
         gamma_k: np.ndarray, nb_iterations: int,
-        W: np.ndarray) -> np.ndarray:
+        W: float) -> np.ndarray:
 
+    """One step of MRI update for Merhanian algorithm using
+    conjugate gradient as in equation (21)
+
+    :param s: mri k-space data
+    :type s: np.ndarray
+    :param rho: parameter rho_v
+    :type rho: float
+    :param z_k: current z_v
+    :type z_k: np.ndarray
+    :param gamma_k: current gamma_v
+    :type gamma_k: np.ndarray
+    :param nb_iterations: maximum number of iterations
+        for the conjugate gradient algorithm
+    :type nb_iterations: int
+    :param W: noise parameter
+    :type W: np.ndarray
+    :returns: The new MRI image
+
+    """
     b = ( ifft2(W * s) - div_2d(list(rho * z_k - gamma_k)) ).flatten()
     A = LinearOperator((b.shape[0], s.flatten().shape[0]), matvec=partial(A_matrix_from_flatten, s.shape, rho, W))
 
     return cg(A, b, maxiter=nb_iterations)[0].reshape(s.shape)
 
 
-def merhanian_constraint_step(correcting_z, comodal_z, current_z, sigma,
-                              lambd, rho):
+def merhanian_constraint_step(correcting_z: np.ndarray,
+                              comodal_z: np.ndarray, current_z: np.ndarray,
+                              sigma: float, lambd: float, rho: float) -> np.ndarray:
 
+    """On step of constraint variable z update for Merhanian
+    algorithm as in equation (25) and (26). Works for
+    both modalities as long as correct parameters are
+    given.
+
+    :param correcting_z: temporary variable defined in equation (24)
+    :type correcting_z: np.ndarray
+    :param comodal_z: rescaled z from the other modality
+    :type comodal_z: np.ndarray
+    :param current_z: current z of the current modality
+    :type current_z: np.ndarray
+    :param sigma: parameter of the regularization function as
+        defined in equation (8)
+    :type sigma: float
+    :param lambd: regularization parameter
+    :type lambd: float
+    :param rho: parameter rho of the current modality
+    :type rho: float
+    :returns: The updated constraint variable
+
+    """
     norm_matrix = co_norm(correcting_z, comodal_z)
     omega = np.exp(-sigma * co_norm(current_z, comodal_z))
     update_matrix = div_zer((norm_matrix - (lambd/rho)*omega).clip(min=0), norm_matrix)
@@ -154,17 +204,58 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
     return image[1:-1, :]
 
 
-def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
-                           pet_number_iterations, mr_number_iterations,
-                           number_iterations,
-                           pet_data, mr_data, pet_shape, mr_shape,
-                           projector_id):
+def merhanian_joint_pet_mr(rho_u: float, rho_v: float, lambda_u: float, lambda_v: float,
+                           sigma: float,
+                           pet_number_iterations: int, mr_number_iterations: int,
+                           number_iterations: int,
+                           pet_data: np.ndarray, mr_data: np.ndarray,
+                           pet_shape: np.ndarray, mr_shape: np.ndarray,
+                           projector_id: int, W: float
+                           ) -> tuple[np.ndarray, np.ndarray]:
+
+    """Joint reconstruction for PET and MRI data based on
+    Merhanian algorithm: https://pubmed.ncbi.nlm.nih.gov/28436851/
+
+    :param rho_u: parameter rho_u
+    :type rho_u: float
+    :param rho_v: parameter rho_v
+    :type rho_v: float
+    :param lambda_u: parameter lambda_u
+    :type lambda_u: float
+    :param lambda_v: parameter lambda_v
+    :type lambda_v: float
+    :param sigma: parameter of the regularization function as
+        defined in equation (8)
+    :type sigma: float
+    :param pet_number_iterations: number of iterations for the
+        PET update
+    :type pet_number_iterations: int
+    :param mr_number_iterations: number of iterations for the
+        conjugate gradient algorithm for the MRI update
+    :type mr_number_iterations: int
+    :param number_iterations: number of iterations for the algorithm
+    :type number_iterations: int
+    :param pet_data: pet projections
+    :type pet_data: np.ndarray
+    :param mr_data: mri k-space data
+    :type mr_data: np.ndarray
+    :param pet_shape: shape of the resulting pet image
+    :type pet_shape: np.ndarray
+    :param mr_shape: shape of the resulting mri image
+    :type mr_shape: np.ndarray
+    :param projector_id: id of the projector to be used
+    :type projector_id: int
+    :param W: noise
+    :type W: float
+    :returns: The reconstructed pet and mri images
+
+    """
 
 
     # Initialization
     epsilon = 10**(-12)
     u = np.ones(pet_shape)
-    v = np.ones(mr_shape)
+    v = np.zeros(mr_shape)
     gamma_u = np.ones((len(pet_shape),) + pet_shape)
     gamma_v = np.ones((len(mr_shape),) + mr_shape)
 
@@ -181,28 +272,28 @@ def merhanian_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
         u = temp_u
 
         # mr update
-        temp_v = np.array(v, copy=True)
-        temp_v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations)
-        v = temp_v
+        v = merhanian_mr_step(mr_data, rho_v, z_v, gamma_v, mr_number_iterations, W)
 
         # Constraint variable update
         correcting_z_u = gradient(u) + gamma_u/rho_u
         correcting_z_v = gradient(v) + gamma_v/rho_v
 
-        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/np.sqrt((generalized_l2_norm_squared(z_u) + epsilon))
-        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/np.sqrt((generalized_l2_norm_squared(z_v) + epsilon))
+        alpha_u = np.sqrt(generalized_l2_norm_squared(z_v))/(np.sqrt(generalized_l2_norm_squared(z_u)) + epsilon)
+        alpha_v = np.sqrt(generalized_l2_norm_squared(z_u))/(np.sqrt(generalized_l2_norm_squared(z_v)) + epsilon)
 
-        z_u = merhanian_constraint_step(correcting_z_u, alpha_u * z_v, z_u, sigma,
+        temp_z_u = merhanian_constraint_step(correcting_z_u, alpha_v * z_v, z_u, sigma,
                                         lambda_u, rho_u)
 
-        z_v = merhanian_constraint_step(correcting_z_v, alpha_v * z_u, z_v, sigma,
+        z_v = merhanian_constraint_step(correcting_z_v, alpha_u * z_u, z_v, sigma,
                                         lambda_v, rho_v)
+
+        z_u = temp_z_u
 
         # Lagrange multiplier update
         gamma_u = gamma_u + rho_u * (gradient(u) - z_u)
         gamma_v = gamma_v + rho_v * (gradient(v) - z_v)
 
-    return u, v
+    return  u, v
 
 
 def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
