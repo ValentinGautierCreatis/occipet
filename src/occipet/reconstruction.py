@@ -317,6 +317,9 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
 
     for i in range(number_iterations):
 
+        points_pet["data_fidelity"].append(data_fidelity_pet(u, pet_data, projector_id))
+        points_mri["data_fidelity"].append(data_fidelity_mri(v, mr_data, W))
+
         z_u = gradient(u)
         z_v = gradient(v)
 
@@ -352,13 +355,11 @@ def courbes_joint_pet_mr(rho_u, rho_v, lambda_u, lambda_v, sigma,
 
         points_pet["reconstruction_error"].append(np.sum(abs(u-pet)))
         points_pet["joint_tv"].append(np.sum(co_norm(z_u, alpha_v * z_v)))
-        points_pet["data_fidelity"].append(data_fidelity_pet(u, pet_data, projector_id))
         points_pet["alpha"].append(alpha_u)
         points_pet["froebenius"].append(generalized_l2_norm_squared(z_u))
 
         points_mri["reconstruction_error"].append(np.sum(abs(v-mri)))
         points_mri["joint_tv"].append(np.sum(co_norm(alpha_u * z_u, z_v)))
-        points_mri["data_fidelity"].append(data_fidelity_mri(v, mr_data, W))
         points_mri["alpha"].append(alpha_v)
         points_mri["froebenius"].append(generalized_l2_norm_squared(z_v))
 

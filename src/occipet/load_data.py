@@ -7,7 +7,7 @@ import numpy as np
 import brainweb
 import pydicom
 from scipy.fft import fft2
-from .utils import create_projector, forward_projection
+from .utils import create_projector, div_zer, forward_projection, back_projection
 
 def load_mnc(path: str) -> np.ndarray:
     """ Load data from a mnc file
@@ -72,7 +72,7 @@ def generate_t1_mr_data_sigma(data_file: str, noise_ratio: float
 
 
 def generate_pet_data(data_file: str, background_event_ratio: float,
-                      angles_step: float = 0.05):
+                      nb_angles: int = 100, nb_photons = 1000):
 
     """generates noisy pet data from brainweb data file
 
@@ -86,9 +86,10 @@ def generate_pet_data(data_file: str, background_event_ratio: float,
     slices = (80,slice(120,230),slice(120,230))
     raw_data = brainweb.load_file(data_file)
     pet, *_ = brainweb.toPetMmr(raw_data, "mMr", brainweb.FDG)
-    pet = pet[slices]/10
+    pet = pet[slices]
+    pet = pet * (nb_photons/(np.sum(pet) * nb_angles))
 
-    angles = np.arange(0, 2*np.pi, angles_step)
+    angles = np.linspace(0, 2*np.pi, nb_angles)
     projector_id = create_projector(pet.shape, angles, None)
     _, proj = forward_projection(pet, projector_id)
     r = (1/(1/background_event_ratio - 1)) * np.ones(proj.shape) * np.sum(proj) / np.sum(np.ones(proj.shape))
@@ -109,3 +110,4 @@ def get_image_from_dicom(path: str) -> np.ndarray:
     """
     data = pydicom.dcmread(path)
     return data.pixel_array
+
