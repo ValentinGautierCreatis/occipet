@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def radial_subsampling(data, factor):
+def radial_subsampling(data:np.ndarray, factor:float)->np.ndarray:
     tab = np.zeros(data.shape, dtype=data.dtype)
     circumference = 2 * np.sum(data.shape)
     number_angles = int((circumference - 4)/factor)

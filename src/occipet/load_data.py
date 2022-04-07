@@ -72,7 +72,7 @@ def generate_t1_mr_data_sigma(data_file: str, noise_ratio: float
 
 
 def generate_pet_data(data_file: str, background_event_ratio: float,
-                      nb_angles: int = 100, nb_photons = 1000):
+                      nb_angles: int = 100, nb_photons = 10**7):
 
     """generates noisy pet data from brainweb data file
 
