@@ -5,7 +5,9 @@ Module used to load data
 import nibabel as nib
 import numpy as np
 import brainweb
-import pydicom
+from pydicom import dcmread
+from pydicom.fileset import FileSet
+import pandas as pd
 from scipy.fft import fft2
 from .utils import create_projector, div_zer, forward_projection, back_projection
 
@@ -108,6 +110,67 @@ def get_image_from_dicom(path: str) -> np.ndarray:
     :returns: the read image
 
     """
-    data = pydicom.dcmread(path)
+    data = dcmread(path)
     return data.pixel_array
 
+
+def make_dataset(fs: FileSet, list_keys: list, include_path=True
+                 ) -> dict:
+    """Generates a dataset from a list of keys in a dicomdir file set
+
+    Parameters
+    ----------
+    fs : FileSet
+        The FileSet from which to generate the dataset
+    list_keys : list
+        List of keys to extract from the file set
+    include_path : Complete
+        If True, adds an entry with the path to each file in the dataset
+
+    Returns
+    -------
+    dict
+        Dictionnary with keys from the input list of keys
+        (+ path if include_path=True)
+
+    """
+    dic = {k: [] for k in list_keys}
+    if include_path:
+        dic["path"] = []
+    for instance in fs:
+        data = instance.load()
+        for key in list_keys:
+            dic[key].append(data[key].value)
+        if include_path:
+            dic["path"].append(instance.path)
+
+    return dic
+
+
+def get_matching_pairs(dicomdir_path: str) -> pd.DataFrame:
+    """Generates a dataframe with the paths to each PET file and
+    its corresponding MR file
+
+    Parameters
+    ----------
+    dicomdir_path : str
+        path to the DICOMDIR file
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with 2 entries: "path" and "paired_mr" corresponding
+        to the path to the PET file and its matching MR file
+        respectively
+
+    """
+    fs = FileSet(dicomdir_path)
+    keys = ["Modality", "SliceLocation"]
+    df = pd.DataFrame.from_dict(make_dataset(fs, keys))
+    pet = df[df["Modality"]=="PT"]
+    mr = df[df["Modality"]=="MR"]
+    pet["paired_mr"] = ""
+    for ind, row in pet.iterrows():
+        distances = mr["SliceLocation"].apply(lambda x: abs(x - row["SliceLocation"]))
+        pet["paired_mr"][ind] = mr["path"][distances.idxmin()]
+    return pet[["path", "paired_mr"]]
