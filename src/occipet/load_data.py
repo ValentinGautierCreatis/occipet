@@ -174,3 +174,15 @@ def get_matching_pairs(dicomdir_path: str) -> pd.DataFrame:
         distances = mr["SliceLocation"].apply(lambda x: abs(x - row["SliceLocation"]))
         pet["paired_mr"][ind] = mr["path"][distances.idxmin()]
     return pet[["path", "paired_mr"]]
+
+
+def make_image_set(pairs_df):
+    images = []
+    for _, row in pairs_df.iterrows():
+        pet = dcmread(row["path"]).pixel_array
+        pet = pet.reshape(pet.shape + (1,))
+        mr = dcmread(row["paired_mr"]).pixel_array
+        mr = mr.reshape(mr.shape + (1,))
+        multi_modal_image = np.concatenate((pet, mr) , axis=2)
+        images.append(multi_modal_image)
+    return np.array(images)
