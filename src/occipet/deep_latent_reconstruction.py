@@ -40,7 +40,7 @@ class DeepLatentReconstruction():
                                               + self.rho*(self.autoencoder.decoder(z)) - mu)
 
 
-    # DONE: z est reçu sous la forme de Tensor comme ça
+    # NOTE: z est reçu sous la forme de Tensor comme ça
     # pas besoin de le reconvertir dans l'algo
     def z_step(self, x, z, mu):
 
@@ -51,14 +51,16 @@ class DeepLatentReconstruction():
             tape.watch(z)
             # careful with the shape z and decoded
             decoded = self.autoencoder.decoder(z)
-            squared = tf.math.multiply(decoded, decoded)
-            product = tf.math.multiply(x + mu, decoded)
+            new_image = (x + mu) - decoded
+            squared = tf.math.multiply(new_image, new_image)
+            # squared = tf.math.multiply(decoded, decoded)
+            # product = tf.math.multiply(x + mu, decoded)
 
-        squared_gradient = (-1/2) * tape.gradient(squared, z)
-        product_gradient = tape.gradient(product, z)
+        squared_gradient = tape.gradient(squared, z)
+        # product_gradient = tape.gradient(product, z)
 
 
-        update_term = self.rho * (squared_gradient + product_gradient)
+        update_term = self.rho * (squared_gradient)
 
         return z - self.S*update_term
 
