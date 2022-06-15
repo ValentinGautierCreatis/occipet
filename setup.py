@@ -1,5 +1,14 @@
 import setuptools
+import glob
 
+def requirements():
+    """List requirements from requirement.txt file
+    """
+    if glob.glob('requirements.txt'):
+        with open('requirements.txt') as requirement_file:
+            return [req.strip() for req in requirement_file.readlines()]
+    else:
+        return []
 setuptools.setup(
     name="occipet",
     version="0.0.1",
@@ -13,6 +22,7 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
+    #install_requires=requirements(),
     entry_points = {
         "console_scripts": [
             "occipet=occipet.app:app"
