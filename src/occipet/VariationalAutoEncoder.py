@@ -128,42 +128,21 @@ class VariationalAutoEncoder(tf.keras.Model):
           "kl_loss": self.kl_loss_tracker.result(),
       }
 
+# checkpoint_path = "training_1/cp.ckpt"
+# checkpoint_dir = os.path.dirname(checkpoint_path)
 
-# original_dim = 784
-# vae = VariationalAutoEncoder(original_dim, 64, 32)  #, input_shape=(784,)
+# Create a callback that saves the model's weights
+# cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                 # save_weights_only=True,
+                                                 # verbose=1)
 
-# optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-# mse_loss_fn = tf.keras.losses.MeanSquaredError()
+# Train the model with the new callback
+# model.fit(train_images,
+#           train_labels,
+#           epochs=10,
+#           validation_data=(test_images, test_labels),
+#           callbacks=[cp_callback])  # Pass callback to training
 
-# loss_metric = tf.keras.metrics.Mean()
-
-# (x_train, _), _ = tf.keras.datasets.mnist.load_data()
-# x_train = x_train.reshape(60000, 784).astype('float32') / 255
-
-# train_dataset = tf.data.Dataset.from_tensor_slices(x_train)
-# train_dataset = train_dataset.shuffle(buffer_size=1024).batch(64)
-
-# # Iterate over epochs.
-# for epoch in range(1):
-#   print('Start of epoch %d' % (epoch,))
-
-#   # Iterate over the batches of the dataset.
-#   for step, x_batch_train in enumerate(train_dataset):
-#     with tf.GradientTape() as tape:
-#       # !!! uncomment the following two lines to use workaround and skip !!!
-#       # if step == 0 and epoch == 0:
-#       #   vae._set_inputs(x_batch_train)
-#       reconstructed = vae(x_batch_train)
-#       # Compute reconstruction loss
-#       loss = mse_loss_fn(x_batch_train, reconstructed)
-#       loss += sum(vae.losses)  # Add KLD regularization loss
-
-#     grads = tape.gradient(loss, vae.trainable_weights)
-#     optimizer.apply_gradients(zip(grads, vae.trainable_weights))
-
-#     loss_metric(loss)
-
-#     if step % 100 == 0:
-#       print('step %s: mean loss = %s' % (step, loss_metric.result()))
-
-# vae.save('vae')
+# This may generate warnings related to saving the state of the optimizer.
+# These warnings (and similar warnings throughout this notebook)
+# are in place to discourage outdated usage, and can be ignored.

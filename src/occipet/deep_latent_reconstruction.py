@@ -5,7 +5,6 @@ import numpy as np
 from occipet.reconstruction import em_step
 from scipy.fft import ifft2
 from .utils import *
-import astra
 import tensorflow as tf
 from . import VariationalAutoEncoder
 
@@ -26,7 +25,7 @@ class DeepLatentReconstruction():
 
     def pet_step(self, x, z, mu):
 
-        sensitivity = back_projection(np.ones(self.y_pet.shape,), self.projector_id)
+        _, sensitivity = back_projection(np.ones(self.y_pet.shape,), self.projector_id)
         x_em = em_step(self.y_pet, x, self.projector_id, sensitivity)
 
         square_root_term = (self.autoencoder.decoder(z) - mu -
