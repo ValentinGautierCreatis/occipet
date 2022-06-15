@@ -167,7 +167,7 @@ def get_matching_pairs(dicomdir_path: str) -> pd.DataFrame:
     fs = FileSet(dicomdir_path)
     keys = ["Modality", "SliceLocation"]
     df = pd.DataFrame.from_dict(make_dataset(fs, keys))
-    pet = df[df["Modality"]=="PT"]
+    pet = df[df["Modality"]=="PT"].sort_values("SliceLocation")
     mr = df[df["Modality"]=="MR"]
     pet["paired_mr"] = ""
     for ind, row in pet.iterrows():
@@ -176,7 +176,7 @@ def get_matching_pairs(dicomdir_path: str) -> pd.DataFrame:
     return pet[["path", "paired_mr"]]
 
 
-def make_image_set(pairs_df):
+def make_image_set(pairs_df: pd.DataFrame) -> np.ndarray:
     images = []
     for _, row in pairs_df.iterrows():
         pet = dcmread(row["path"]).pixel_array
