@@ -6,12 +6,12 @@ from occipet.reconstruction import em_step
 from scipy.fft import ifft2
 from .utils import *
 import tensorflow as tf
-from . import VariationalAutoEncoder
+from deep_learning import variational_auto_encoder
 
 # TODO: Mettre les Decoder(z) au bon format (tel quel ce sont des tensor shape (1, w, h, 2))
 class DeepLatentReconstruction():
     def __init__(self, y_pet, y_mri, rho, step_size, projector_id,
-                 autoencoder: VariationalAutoEncoder.VariationalAutoEncoder,
+                 autoencoder: variational_auto_encoder.VariationalAutoEncoder,
                  S) -> None:
         self.y_pet = y_pet
         self.y_mri = y_mri
