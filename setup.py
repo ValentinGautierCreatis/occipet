@@ -25,7 +25,8 @@ setuptools.setup(
     #install_requires=requirements(),
     entry_points = {
         "console_scripts": [
-            "occipet=occipet.app:app"
+            "occipet=occipet.app:app",
+            "deep_learning=deep_learning.app:app"
         ]
     },
     python_requires=">=3.6",
