@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "occipet"
+version = "0.1.0"
+description = ""
+authors = ["Valentin Gautier <valentin.gautier@creatis.insa-lyon.fr>"]
+packages = [
+    { include = "occipet", from = "src" },
+    { include = "deep_learning", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "~3.9"
+numpy = "^1.22.4"
+tensorflow = "^2.9.1"
+astra-toolbox = "^1.8b5"
+brainweb = "^1.6.2"
+nibabel = "^3.2.2"
+pydicom = "^2.3.0"
+scipy = "^1.8.1"
+pandas = "^1.4.2"
+typer = "^0.4.1"
+setuptools = "^62.4.0"
+matplotlib = "^3.5.2"
+
+[tool.poetry.dev-dependencies]
+jupyterlab = "^3.4.3"
+
+[tool.poetry.scripts]
+occipet = "occipet.app:app"
+deep_learning = "deep_learning.app:app"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
