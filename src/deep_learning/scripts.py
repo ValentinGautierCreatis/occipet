@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 import pathlib
 
+from .variational_auto_encoder import VariationalAutoEncoder
 
 def train_model(model: tf.keras.Model, checkpoint_dir: str,
                 inputs: np.ndarray, labels: np.ndarray) -> None:
@@ -22,9 +23,12 @@ def train_model(model: tf.keras.Model, checkpoint_dir: str,
 
 
 
-def train_vae(model_dir: str, checkpoint_dir: str,
+def train_vae(checkpoint_dir: str,
               data_path: str) -> None:
 
-    model = tf.keras.models.load_model(model_dir)
+    model = VariationalAutoEncoder((256, 256, 2))
+    checkpoint_path = pathlib.Path(checkpoint_dir)
     data = np.load(data_path)
+    if checkpoint_path.exists():
+        model.load_weights(checkpoint_dir)
     train_model(model, checkpoint_dir, data, data)

@@ -10,7 +10,7 @@ app = Typer()
 
 
 @app.command("train_vae")
-def train_vae_wrapper(model_dir: str, checkpoint_dir: str,
+def train_vae_wrapper(checkpoint_dir: str,
                       data_path: str) -> None:
 
-    train_vae(model_dir, checkpoint_dir, data_path)
+    train_vae(checkpoint_dir, data_path)
