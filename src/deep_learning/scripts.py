@@ -27,6 +27,8 @@ def train_vae(checkpoint_dir: str,
               data_path: str) -> None:
 
     model = VariationalAutoEncoder((256, 256, 2))
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError())
     checkpoint_path = pathlib.Path(checkpoint_dir)
     data = np.load(data_path)
     model(data[:1,:,:,:])
