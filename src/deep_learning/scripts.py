@@ -29,6 +29,7 @@ def train_vae(checkpoint_dir: str,
     model = VariationalAutoEncoder((256, 256, 2))
     checkpoint_path = pathlib.Path(checkpoint_dir)
     data = np.load(data_path)
+    model(data[:1,:,:,:])
     if checkpoint_path.exists():
         model.load_weights(checkpoint_dir)
     train_model(model, checkpoint_dir, data, data)
