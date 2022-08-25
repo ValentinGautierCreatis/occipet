@@ -24,19 +24,21 @@ class DeepLatentReconstruction():
 
 
     def pet_step(self, x, z, mu):
-
+        pet_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape)
         _, sensitivity = back_projection(np.ones(self.y_pet.shape,), self.projector_id)
         x_em = em_step(self.y_pet, x, self.projector_id, sensitivity)
 
-        square_root_term = (self.autoencoder.decoder(z) - mu -
+        square_root_term = (pet_decoded - mu -
                             (sensitivity/self.rho))**2 + (4*x_em*sensitivity)/self.rho
-        return 0.5*(self.autoencoder.decoder(z) - mu - (sensitivity/self.rho) - np.sqrt(square_root_term))
+        return 0.5*(pet_decoded - mu - (sensitivity/self.rho) - np.sqrt(square_root_term))
 
 
     def MR_step(self, z, mu):
 
+        mr_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,1]
+        mr_decoded = mr_decoded.reshape((mr_decoded.shape[1], mr_decoded.shape[2]))
         return (1/(self.rho + self.mri_N)) * (self.mri_N * ifft2(self.y_mri)
-                                              + self.rho*(self.autoencoder.decoder(z)) - mu)
+                                              + self.rho*(mr_decoded) - mu)
 
 
     # NOTE: z est reçu sous la forme de Tensor comme ça
@@ -66,6 +68,8 @@ class DeepLatentReconstruction():
 
 
     def lagragian_step(self, x, z, mu):
+        decoded = self.autoencoder.decoder(z).numpy()
+        decoded = decoded.reshape(decoded.shape[1:])
         return mu + x - self.autoencoder.decoder(z)
 
 
@@ -75,10 +79,10 @@ class DeepLatentReconstruction():
         mu = mu0
         for _ in range(nb_iterations):
 
-            x_pet = x0[:, :, 0]
-            new_x_pet = self.pet_step(x_pet, z, mu)
+            x_pet = x[:, :, 0]
+            new_x_pet = self.pet_step(x_pet, z, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
-            new_x_mr = self.MR_step(z, mu)
+            new_x_mr = self.MR_step(z, mu[:,:,1])
             new_x_mr = new_x_mr.reshape(new_x_mr.shape + (1,))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
