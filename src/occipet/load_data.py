@@ -5,6 +5,7 @@ Module used to load data
 import nibabel as nib
 import numpy as np
 import brainweb
+import pathlib
 from pydicom import dcmread
 from pydicom.fileset import FileSet
 import pandas as pd
@@ -186,3 +187,13 @@ def make_image_set(pairs_df: pd.DataFrame) -> np.ndarray:
         multi_modal_image = np.concatenate((pet, mr) , axis=2)
         images.append(multi_modal_image)
     return np.array(images)
+
+
+def create_patient_dicomdir(path: str) -> None:
+    p = pathlib.Path(path).rglob("*.dcm")
+    files = [x for x in p if x.is_file()]
+    fs = FileSet()
+    for f in files:
+        fs.add(str(f))
+
+    fs.write(str(path))
