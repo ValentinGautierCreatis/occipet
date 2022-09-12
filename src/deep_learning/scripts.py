@@ -16,7 +16,7 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
     model.fit(
         inputs,
         labels,
-        epochs=10,
+        epochs=100,
         callbacks=[cp_callback]
     )
 
@@ -28,7 +28,7 @@ def train_vae(checkpoint_dir: str,
     tf.keras.backend.clear_session()
     model = VariationalAutoEncoder((256, 256, 2))
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-    model.compile(optimizer=optimizer, loss=tf.keras.losses.MeanSquaredError())
+    model.compile(optimizer=optimizer)#, loss=tf.keras.losses.MeanSquaredError())
     checkpoint_path = pathlib.Path(checkpoint_dir)
     data = np.load(data_path)
     model(data[:1,:,:,:])
