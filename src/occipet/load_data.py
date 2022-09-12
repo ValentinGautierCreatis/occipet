@@ -74,6 +74,20 @@ def generate_t1_mr_data_sigma(data_file: str, noise_ratio: float
     return t1, noisy_signal, sigma
 
 
+
+def generate_t1_mr_data_from_image(image: np.ndarray, noise_ratio: float
+                              ):
+    """generates noisy mri data from brainweb data file
+
+    """
+    signal = fft2(image)
+    sigma = noise_ratio * np.amax(abs(signal))
+    noise = np.random.normal(0, sigma, signal.shape)
+    noisy_signal = signal + noise/10
+
+    return noisy_signal, sigma
+
+
 def generate_pet_data(data_file: str, background_event_ratio: float,
                       nb_angles: int = 100, nb_photons = 10**7):
 
@@ -100,6 +114,25 @@ def generate_pet_data(data_file: str, background_event_ratio: float,
     proj = proj + r
 
     return pet, np.random.poisson(proj), projector_id
+
+
+def generate_pet_data_from_image(image: np.ndarray, background_event_ratio: float,
+                      nb_angles: int = 100, nb_photons = 10**7):
+
+    """generates noisy pet data from an image
+
+
+    """
+    pet = image * (nb_photons/(np.sum(image) * nb_angles))
+
+    angles = np.linspace(0, 2*np.pi, nb_angles)
+    projector_id = create_projector(pet.shape, angles, None)
+    _, proj = forward_projection(pet, projector_id)
+    r = (1/(1/background_event_ratio - 1)) * np.ones(proj.shape) * np.sum(proj) / np.sum(np.ones(proj.shape))
+
+    proj = proj + r
+
+    return np.random.poisson(proj), projector_id
 
 
 def get_image_from_dicom(path: str) -> np.ndarray:

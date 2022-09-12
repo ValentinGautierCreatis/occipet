@@ -8,11 +8,11 @@ from .utils import *
 import tensorflow as tf
 from deep_learning import variational_auto_encoder
 
-# TODO: Mettre les Decoder(z) au bon format (tel quel ce sont des tensor shape (1, w, h, 2))
+
 class DeepLatentReconstruction():
     def __init__(self, y_pet, y_mri, rho, step_size, projector_id,
                  autoencoder: variational_auto_encoder.VariationalAutoEncoder,
-                 S) -> None:
+                 ) -> None:
         self.y_pet = y_pet
         self.y_mri = y_mri
         self.rho = rho
@@ -20,7 +20,6 @@ class DeepLatentReconstruction():
         self.projector_id = projector_id
         self.autoencoder = autoencoder
         self.mri_N = np.product(y_mri.shape)
-        self.S = S
 
 
     def pet_step(self, x, z, mu):
@@ -30,7 +29,8 @@ class DeepLatentReconstruction():
 
         square_root_term = (pet_decoded - mu -
                             (sensitivity/self.rho))**2 + (4*x_em*sensitivity)/self.rho
-        return 0.5*(pet_decoded - mu - (sensitivity/self.rho) - np.sqrt(square_root_term))
+        # Diff avec la publi, c'est + sqrt et pas -
+        return 0.5*(pet_decoded - mu - (sensitivity/self.rho) + np.sqrt(square_root_term))
 
 
     def MR_step(self, z, mu):
@@ -45,8 +45,8 @@ class DeepLatentReconstruction():
     # pas besoin de le reconvertir dans l'algo
     def z_step(self, x, z, mu):
 
-        x = tf.Variable(x.reshape((1,) + x.shape))
-        mu = tf.Variable(mu.reshape((1,) + mu.shape))
+        x = tf.Variable(x.reshape((1,) + x.shape), dtype=tf.float32)
+        mu = tf.Variable(mu.reshape((1,) + mu.shape), dtype=tf.float32)
         with tf.GradientTape() as tape:
 
             tape.watch(z)
@@ -63,18 +63,18 @@ class DeepLatentReconstruction():
 
         update_term = self.rho * (squared_gradient)
 
-        return z - self.S*update_term
+        return z - self.step_size*update_term
 
 
 
     def lagragian_step(self, x, z, mu):
         decoded = self.autoencoder.decoder(z).numpy()
         decoded = decoded.reshape(decoded.shape[1:])
-        return mu + x - self.autoencoder.decoder(z)
+        return mu + x - decoded
 
 
     def reconstruct(self, x0, mu0, nb_iterations):
-        z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
+        *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
         x = x0
         mu = mu0
         for _ in range(nb_iterations):
@@ -83,7 +83,7 @@ class DeepLatentReconstruction():
             new_x_pet = self.pet_step(x_pet, z, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
             new_x_mr = self.MR_step(z, mu[:,:,1])
-            new_x_mr = new_x_mr.reshape(new_x_mr.shape + (1,))
+            new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
             z = self.z_step(x, z, mu)
