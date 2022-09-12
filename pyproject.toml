@@ -11,8 +11,8 @@ packages = [
 [tool.poetry.dependencies]
 python = "~3.9"
 numpy = "^1.22.4"
-tensorflow = "^2.9.1"
-astra-toolbox = "^1.8b5"
+# tensorflow = "^2.9.1"
+# astra-toolbox = "*"
 brainweb = "^1.6.2"
 nibabel = "^3.2.2"
 pydicom = "^2.3.0"
