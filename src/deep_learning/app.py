@@ -4,13 +4,13 @@ here are Typer wrapper around scripts from the file "scripts.py"
 """
 
 from typer import Typer, Option
-from .scripts import train_vae
+from .scripts import train_vae, train_vae_param
+from tools.parameters import Parameters
 
 app = Typer()
 
 
 @app.command("train_vae")
-def train_vae_wrapper(checkpoint_dir: str,
-                      data_path: str) -> None:
-
-    train_vae(checkpoint_dir, data_path)
+def train_vae_wrapper(params_path: str) -> None:
+    parameters = Parameters.from_json(params_path)
+    train_vae_param(parameters)
