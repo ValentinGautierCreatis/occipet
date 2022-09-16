@@ -8,7 +8,8 @@ from .variational_auto_encoder import VariationalAutoEncoder
 
 def train_model(model: tf.keras.Model, checkpoint_path: str,
                 inputs: np.ndarray, labels: np.ndarray,
-                nb_epochs=100, batch_size=32) -> None:
+                nb_epochs=100, batch_size=32,
+                validation_split=0.0) -> None:
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path,
         # save_weights_only=True,
@@ -20,7 +21,8 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
         labels,
         epochs=nb_epochs,
         batch_size=batch_size,
-        callbacks=[cp_callback]
+        callbacks=[cp_callback],
+        validation_split=validation_split
     )
 
 
@@ -28,7 +30,8 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
 def train_vae(checkpoint_dir: str,
               data_path: str, latent_dim: int,
               nb_epochs = 100, batch_size=32,
-              learning_rate=1e-3) -> None:
+              learning_rate=1e-3,
+              validation_split=0.0) -> None:
 
     tf.keras.backend.clear_session()
     model = VariationalAutoEncoder((256, 256, 2), latent_dim=latent_dim)
@@ -39,12 +42,14 @@ def train_vae(checkpoint_dir: str,
     model(data[:1,:,:,:])
     if checkpoint_path.exists():
         model.load_weights(checkpoint_path)
+
     train_model(model, str(checkpoint_path.resolve()), data, data,
-                nb_epochs, batch_size)
+                nb_epochs, batch_size, validation_split)
 
 
 def train_vae_param(parameters: Parameters) -> None:
 
     train_vae(parameters["checkpoint_dir"], parameters["data_path"],
               parameters["latent_dim"], parameters["nb_epochs"],
-              parameters["batch_size"], parameters["learning_rate"])
+              parameters["batch_size"], parameters["learning_rate"],
+              parameters["validation_split"])
