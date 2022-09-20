@@ -4,6 +4,7 @@ import numpy as np
 
 from occipet.reconstruction import em_step
 from scipy.fft import ifft2
+from math import sqrt
 from .utils import *
 import tensorflow as tf
 from deep_learning import variational_auto_encoder
@@ -19,7 +20,7 @@ class DeepLatentReconstruction():
         self.step_size= step_size
         self.projector_id = projector_id
         self.autoencoder = autoencoder
-        self.mri_N = np.product(y_mri.shape)
+        self.mri_N = sqrt(np.product(y_mri.shape))
 
 
     def pet_step(self, x, z, mu):
@@ -38,7 +39,7 @@ class DeepLatentReconstruction():
         mr_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,1]
         mr_decoded = mr_decoded.reshape((mr_decoded.shape[1], mr_decoded.shape[2]))
         return (1/(self.rho + self.mri_N)) * (self.mri_N * ifft2(self.y_mri)
-                                              + self.rho*(mr_decoded) - mu)
+                                              + self.rho*(mr_decoded - mu))
 
 
     # NOTE: z est reçu sous la forme de Tensor comme ça
@@ -61,7 +62,7 @@ class DeepLatentReconstruction():
         # product_gradient = tape.gradient(product, z)
 
 
-        update_term = self.rho * (squared_gradient)
+        update_term = self.rho/2 * (squared_gradient)
 
         return z - self.step_size*update_term
 
@@ -91,3 +92,23 @@ class DeepLatentReconstruction():
             mu = self.lagragian_step(x, z, mu)
 
         return x
+
+
+    def reconstruct_test(self, x0, mu0, nb_iterations):
+        *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
+        x = x0
+        mu = mu0
+        for _ in range(nb_iterations):
+
+            x_pet = x[:, :, 0]
+            new_x_pet = self.pet_step(x_pet, z, mu[:,:,0])
+            new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
+            new_x_mr = self.MR_step(z, mu[:,:,1])
+            new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
+            x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
+
+            z = self.z_step(x, z, mu)
+
+            mu = self.lagragian_step(x, z, mu)
+
+        return x,z
