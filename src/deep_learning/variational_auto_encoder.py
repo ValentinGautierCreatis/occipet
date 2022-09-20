@@ -128,6 +128,37 @@ class VariationalAutoEncoder(tf.keras.Model):
           "kl_loss": self.kl_loss_tracker.result(),
       }
 
+class BetaVAE(VariationalAutoEncoder):
+  def __init__(self, original_dim, latent_dim=32, beta=1, name='autoencoder',
+               **kwargs):
+    self.beta = beta
+    super().__init__(original_dim, latent_dim, name, **kwargs)
+
+  def train_step(self, data):
+      with tf.GradientTape() as tape:
+          # data = tf.convert_to_tensor(data)
+          x, _ = data
+          z_mean, z_log_var, z = self.encoder(x)
+          reconstruction = self.decoder(z)
+          reconstruction_loss = tf.reduce_mean(
+              tf.reduce_sum(
+                  keras.losses.mean_squared_error(x, reconstruction), axis=(1, 2)
+              )
+          )
+          kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+          kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+          total_loss = reconstruction_loss + self.beta*kl_loss
+
+      grads = tape.gradient(total_loss, self.trainable_weights)
+      self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+      self.total_loss_tracker.update_state(total_loss)
+      self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+      self.kl_loss_tracker.update_state(kl_loss)
+      return {
+          "total_loss": self.total_loss_tracker.result(),
+          "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+          "kl_loss": self.kl_loss_tracker.result(),
+      }
 # checkpoint_path = "training_1/cp.ckpt"
 # checkpoint_dir = os.path.dirname(checkpoint_path)
 
