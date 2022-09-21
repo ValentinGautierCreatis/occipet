@@ -108,10 +108,8 @@ class VariationalAutoEncoder(tf.keras.Model):
           x, _ = data
           z_mean, z_log_var, z = self.encoder(x)
           reconstruction = self.decoder(z)
-          reconstruction_loss = tf.reduce_mean(
-              tf.reduce_sum(
-                  keras.losses.mean_squared_error(x, reconstruction), axis=(1, 2)
-              )
+          reconstruction_loss = tf.reduce_sum(
+              tf.square(x - reconstruction)
           )
           kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
           kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
@@ -140,10 +138,8 @@ class BetaVAE(VariationalAutoEncoder):
           x, _ = data
           z_mean, z_log_var, z = self.encoder(x)
           reconstruction = self.decoder(z)
-          reconstruction_loss = tf.reduce_mean(
-              tf.reduce_sum(
-                  keras.losses.mean_squared_error(x, reconstruction), axis=(1, 2)
-              )
+          reconstruction_loss = tf.reduce_sum(
+              tf.square(x - reconstruction)
           )
           kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
           kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
@@ -157,6 +153,54 @@ class BetaVAE(VariationalAutoEncoder):
       return {
           "total_loss": self.total_loss_tracker.result(),
           "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+          "kl_loss": self.kl_loss_tracker.result(),
+      }
+
+
+def bimodal_loss(mod1, mod2, label1, label2):
+    loss1 = tf.reduce_sum(tf.square(mod1 - label1))
+    loss2 = tf.reduce_sum(tf.square(mod2 - label2))
+
+    return loss1, loss2
+
+
+class BimodalBetaVAE(BetaVAE):
+  def __init__(self, original_dim, latent_dim=32, beta=1, mod1_weight=1,
+               name='autoencoder', **kwargs):
+    self.mod1_weight = mod1_weight
+    self.mod1_loss_tracker = keras.metrics.Mean(name="mod1 loss")
+    self.mod2_loss_tracker = keras.metrics.Mean(name="mod2 loss")
+    super().__init__(original_dim, latent_dim, beta, name, **kwargs)
+
+  def train_step(self, data):
+      with tf.GradientTape() as tape:
+          # data = tf.convert_to_tensor(data)
+          x, _ = data
+          z_mean, z_log_var, z = self.encoder(x)
+          reconstruction = self.decoder(z)
+
+          mod1, mod2 = tf.split(reconstruction, 2, axis=-1)
+          label1, label2 = tf.split(x, 2, axis=-1)
+          loss1, loss2 = bimodal_loss(mod1, mod2, label1, label2)
+
+          reconstruction_loss = loss1 + loss2
+
+          kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+          kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+          total_loss = reconstruction_loss + self.beta*kl_loss
+
+      grads = tape.gradient(total_loss, self.trainable_weights)
+      self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+      self.total_loss_tracker.update_state(total_loss)
+      self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+      self.kl_loss_tracker.update_state(kl_loss)
+      self.mod1_loss_tracker.update_state(loss1)
+      self.mod2_loss_tracker.update_state(loss2)
+      return {
+          "total_loss": self.total_loss_tracker.result(),
+          "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+          "loss 1": self.mod1_loss_tracker.result(),
+          "loss 2": self.mod2_loss_tracker.result(),
           "kl_loss": self.kl_loss_tracker.result(),
       }
 # checkpoint_path = "training_1/cp.ckpt"
