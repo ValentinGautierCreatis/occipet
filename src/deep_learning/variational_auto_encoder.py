@@ -8,6 +8,27 @@ import tensorflow as tf
 tf.keras.backend.clear_session()  # For easy reset of notebook state.
 
 
+def l2_loss(x, y):
+  """Computes the l2 loss between 2 batches of images of
+  shape (None, w, h, c)
+
+
+
+  Parameters
+  ----------
+  x : image 1
+  y : image 2
+
+  """
+
+  reconstruction_loss = tf.reduce_mean(
+    tf.reduce_sum(
+      tf.square(x - y), axis=(1,2,3)
+    )
+  )
+
+  return reconstruction_loss
+
 class Sampling(layers.Layer):
   """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
 
@@ -108,9 +129,13 @@ class VariationalAutoEncoder(tf.keras.Model):
           x, _ = data
           z_mean, z_log_var, z = self.encoder(x)
           reconstruction = self.decoder(z)
-          reconstruction_loss = tf.reduce_sum(
-              tf.square(x - reconstruction)
+
+          reconstruction_loss = tf.reduce_mean(
+            tf.reduce_sum(
+              tf.square(x - reconstruction), axis=(1,2,3)
+            )
           )
+
           kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
           kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
           total_loss = reconstruction_loss + kl_loss
@@ -138,8 +163,10 @@ class BetaVAE(VariationalAutoEncoder):
           x, _ = data
           z_mean, z_log_var, z = self.encoder(x)
           reconstruction = self.decoder(z)
-          reconstruction_loss = tf.reduce_sum(
-              tf.square(x - reconstruction)
+          reconstruction_loss = tf.reduce_mean(
+            tf.reduce_sum(
+              tf.square(x - reconstruction), axis=(1,2,3)
+            )
           )
           kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
           kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
@@ -158,8 +185,13 @@ class BetaVAE(VariationalAutoEncoder):
 
 
 def bimodal_loss(mod1, mod2, label1, label2):
-    loss1 = tf.reduce_sum(tf.square(mod1 - label1))
-    loss2 = tf.reduce_sum(tf.square(mod2 - label2))
+
+    loss1 = tf.reduce_sum(
+        tf.square(mod1 - label1), axis=(1,2,3)
+    )
+    loss2 = tf.reduce_sum(
+        tf.square(mod2 - label2), axis=(1,2,3)
+    )
 
     return loss1, loss2
 
