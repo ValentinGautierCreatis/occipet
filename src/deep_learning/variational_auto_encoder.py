@@ -151,6 +151,10 @@ class VariationalAutoEncoder(tf.keras.Model):
           "kl_loss": self.kl_loss_tracker.result(),
       }
 
+  def test_step(self, data):
+    return self.train_step(data)
+
+
 class BetaVAE(VariationalAutoEncoder):
   def __init__(self, original_dim, latent_dim=32, beta=1, name='autoencoder',
                **kwargs):
@@ -186,11 +190,11 @@ class BetaVAE(VariationalAutoEncoder):
 
 def bimodal_loss(mod1, mod2, label1, label2):
 
-    loss1 = tf.reduce_sum(
-        tf.square(mod1 - label1), axis=(1,2,3)
+    loss1 = tf.reduce_mean(
+      tf.reduce_sum(tf.square(mod1 - label1), axis=(1,2,3))
     )
-    loss2 = tf.reduce_sum(
-        tf.square(mod2 - label2), axis=(1,2,3)
+    loss2 = tf.reduce_mean(
+      tf.reduce_sum(tf.square(mod2 - label2), axis=(1,2,3))
     )
 
     return loss1, loss2
@@ -215,7 +219,7 @@ class BimodalBetaVAE(BetaVAE):
           label1, label2 = tf.split(x, 2, axis=-1)
           loss1, loss2 = bimodal_loss(mod1, mod2, label1, label2)
 
-          reconstruction_loss = loss1 + loss2
+          reconstruction_loss = self.mod1_weight * loss1 + loss2
 
           kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
           kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
