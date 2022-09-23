@@ -21,7 +21,7 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
     log_dir = str(pathlib.Path(checkpoint_path) / ".." / "logs" /
                   datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
-    tensorboard_callback = tf.keras.callbacks.Tensorboard(
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=log_dir
     )
 
