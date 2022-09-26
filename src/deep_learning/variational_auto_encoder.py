@@ -200,7 +200,7 @@ def bimodal_loss(mod1, mod2, label1, label2):
     return loss1, loss2
 
 
-class BimodalBetaVAE(BetaVAE):
+class BimodalVAE(BetaVAE):
   def __init__(self, original_dim, latent_dim=32, beta=1, mod1_weight=1,
                name='autoencoder', **kwargs):
     self.mod1_weight = mod1_weight
@@ -230,7 +230,7 @@ class BimodalBetaVAE(BetaVAE):
       self.total_loss_tracker.update_state(total_loss)
       self.reconstruction_loss_tracker.update_state(reconstruction_loss)
       self.kl_loss_tracker.update_state(kl_loss)
-      self.mod1_loss_tracker.update_state(loss1)
+      self.mod1_loss_tracker.update_state(self.mod1_weight * loss1)
       self.mod2_loss_tracker.update_state(loss2)
       return {
           "total_loss": self.total_loss_tracker.result(),

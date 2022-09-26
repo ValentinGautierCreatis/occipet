@@ -71,7 +71,7 @@ def train_vae_param(parameters: Parameters) -> None:
     train_vae(**{k: v for k,v in parameters.data.items()})
 
 def train_beta_vae(checkpoint_dir: str,
-                   data_path: str, latent_dim: int, beta: float,
+                   data_path: str, latent_dim: int, beta: float=1.0,
                    nb_epochs = 100, batch_size=32,
                    learning_rate=1e-3,
                    validation_split=0.0,
@@ -94,3 +94,32 @@ def train_beta_vae(checkpoint_dir: str,
 def train_beta_vae_param(parameters: Parameters) -> None:
 
     train_beta_vae(**{k: v for k,v in parameters.data.items()})
+
+
+
+def train_bimodal_vae(checkpoint_dir: str,
+                      data_path: str, latent_dim: int, beta:float=1.0,
+                      mod1_weight:float=1.0, nb_epochs = 100, batch_size=32,
+                      learning_rate=1e-3,
+                      validation_split=0.0,
+                      tensorboard=False) -> None:
+
+    tf.keras.backend.clear_session()
+    model = BetaVAE((256, 256, 2), latent_dim=latent_dim, beta=beta,
+                    mod1_weight=mod1_weight)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    model.compile(optimizer=optimizer)#, loss=tf.keras.losses.MeanSquaredError())
+    checkpoint_path = pathlib.Path(checkpoint_dir)
+    data = np.load(data_path)
+    model(data[:1,:,:,:])
+    if checkpoint_path.exists():
+        model.load_weights(checkpoint_path)
+
+    train_model(model, str(checkpoint_path.resolve()), data, data,
+                nb_epochs, batch_size, validation_split, tensorboard)
+
+
+def train_bimodal_vae_param(parameters: Parameters) -> None:
+
+    train_bimodal_vae(**{k: v for k,v in parameters.data.items()})
