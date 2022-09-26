@@ -5,7 +5,7 @@ import pathlib
 import datetime
 
 from tools.parameters import Parameters
-from .variational_auto_encoder import BetaVAE, VariationalAutoEncoder
+from .variational_auto_encoder import BetaVAE, BimodalVAE, VariationalAutoEncoder
 
 def train_model(model: tf.keras.Model, checkpoint_path: str,
                 inputs: np.ndarray, labels: np.ndarray,
@@ -105,7 +105,7 @@ def train_bimodal_vae(checkpoint_dir: str,
                       tensorboard=False) -> None:
 
     tf.keras.backend.clear_session()
-    model = BetaVAE((256, 256, 2), latent_dim=latent_dim, beta=beta,
+    model = BimodalVAE((256, 256, 2), latent_dim=latent_dim, beta=beta,
                     mod1_weight=mod1_weight)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
