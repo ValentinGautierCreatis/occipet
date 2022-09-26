@@ -158,8 +158,8 @@ class VariationalAutoEncoder(tf.keras.Model):
 class BetaVAE(VariationalAutoEncoder):
   def __init__(self, original_dim, latent_dim=32, beta=1, name='autoencoder',
                **kwargs):
-    self.beta = beta
     super().__init__(original_dim, latent_dim, name, **kwargs)
+    self.beta = beta
 
   def train_step(self, data):
       with tf.GradientTape() as tape:
@@ -203,10 +203,10 @@ def bimodal_loss(mod1, mod2, label1, label2):
 class BimodalVAE(BetaVAE):
   def __init__(self, original_dim, latent_dim=32, beta=1, mod1_weight=1,
                name='autoencoder', **kwargs):
+    super().__init__(original_dim, latent_dim, beta, name, **kwargs)
     self.mod1_weight = mod1_weight
     self.mod1_loss_tracker = keras.metrics.Mean(name="mod1 loss")
     self.mod2_loss_tracker = keras.metrics.Mean(name="mod2 loss")
-    super().__init__(original_dim, latent_dim, beta, name, **kwargs)
 
   def train_step(self, data):
       with tf.GradientTape() as tape:
