@@ -20,7 +20,7 @@ class DeepLatentReconstruction():
         self.step_size= step_size
         self.projector_id = projector_id
         self.autoencoder = autoencoder
-        self.mri_N = sqrt(np.product(y_mri.shape))
+        self.mri_N = (np.product(y_mri.shape))
 
 
     def pet_step(self, x, z, mu):
@@ -54,7 +54,7 @@ class DeepLatentReconstruction():
             # careful with the shape z and decoded
             decoded = self.autoencoder.decoder(z)
             new_image = (x + mu) - decoded
-            squared = tf.math.multiply(new_image, new_image)
+            squared = tf.math.square(new_image)
             # squared = tf.math.multiply(decoded, decoded)
             # product = tf.math.multiply(x + mu, decoded)
 
@@ -94,10 +94,11 @@ class DeepLatentReconstruction():
         return x
 
 
-    def reconstruct_test(self, x0, mu0, nb_iterations):
+    def reconstruct_test(self, x0, mu0, nb_iterations, ref_pet):
         *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
         x = x0
         mu = mu0
+        z_pet_quality = []
         for _ in range(nb_iterations):
 
             x_pet = x[:, :, 0]
@@ -111,4 +112,8 @@ class DeepLatentReconstruction():
 
             mu = self.lagragian_step(x, z, mu)
 
-        return x,z
+            pet_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape[:-1])
+            pet_error = np.sum(np.square(pet_decoded - ref_pet))
+
+            z_pet_quality.append(pet_error)
+        return x,z, z_pet_quality
