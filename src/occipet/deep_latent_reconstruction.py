@@ -23,8 +23,13 @@ class DeepLatentReconstruction():
         self.mri_N = (np.product(y_mri.shape))
 
 
-    def pet_step(self, x, z, mu):
-        pet_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape)
+    def decoding(self, z):
+        decoded = self.autoencoder.decoder(z).numpy()
+        decoded = np.squeeze(decoded, axis=0)
+        return decoded
+
+
+    def pet_step(self, x, pet_decoded, mu):
         _, sensitivity = back_projection(np.ones(self.y_pet.shape,), self.projector_id)
         x_em = em_step(self.y_pet, x, self.projector_id, sensitivity)
 
@@ -34,10 +39,8 @@ class DeepLatentReconstruction():
         return 0.5*(pet_decoded - mu - (sensitivity/self.rho) + np.sqrt(square_root_term))
 
 
-    def MR_step(self, z, mu):
+    def MR_step(self, mr_decoded, mu):
 
-        mr_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,1]
-        mr_decoded = mr_decoded.reshape((mr_decoded.shape[1], mr_decoded.shape[2]))
         return (1/(self.rho + self.mri_N)) * (self.mri_N * ifft2(self.y_mri)
                                               + self.rho*(mr_decoded - mu))
 
@@ -80,10 +83,13 @@ class DeepLatentReconstruction():
         mu = mu0
         for _ in range(nb_iterations):
 
+            decoded = self.decoding(z)
+            pet_decoded = decoded[:,:,0]
+            mr_decoded = decoded[:,:,1]
             x_pet = x[:, :, 0]
-            new_x_pet = self.pet_step(x_pet, z, mu[:,:,0])
+            new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
-            new_x_mr = self.MR_step(z, mu[:,:,1])
+            new_x_mr = self.MR_step(mr_decoded, mu[:,:,1])
             new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
@@ -101,10 +107,13 @@ class DeepLatentReconstruction():
         z_pet_quality = []
         for _ in range(nb_iterations):
 
+            decoded = self.decoding(z)
+            pet_decoded = decoded[:,:,0]
+            mr_decoded = decoded[:,:,1]
             x_pet = x[:, :, 0]
-            new_x_pet = self.pet_step(x_pet, z, mu[:,:,0])
+            new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
-            new_x_mr = self.MR_step(z, mu[:,:,1])
+            new_x_mr = self.MR_step(mr_decoded, mu[:,:,1])
             new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
@@ -112,8 +121,8 @@ class DeepLatentReconstruction():
 
             mu = self.lagragian_step(x, z, mu)
 
-            pet_decoded = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape[:-1])
-            pet_error = np.sum(np.square(pet_decoded - ref_pet))
+            pet_ = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape[:-1])
+            pet_error = np.sum(np.square(pet_ - ref_pet))
 
             z_pet_quality.append(pet_error)
         return x,z, z_pet_quality
