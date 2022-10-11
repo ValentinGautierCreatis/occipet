@@ -20,7 +20,7 @@ class DeepLatentReconstruction():
         self.step_size= step_size
         self.projector_id = projector_id
         self.autoencoder = autoencoder
-        self.mri_N = (np.product(y_mri.shape))
+        self.mri_N = 1 #(np.product(y_mri.shape))
 
 
     def decoding(self, z):
@@ -70,7 +70,6 @@ class DeepLatentReconstruction():
         return z - self.step_size*update_term
 
 
-
     def lagragian_step(self, x, z, mu):
         decoded = self.autoencoder.decoder(z).numpy()
         decoded = decoded.reshape(decoded.shape[1:])
@@ -100,16 +99,52 @@ class DeepLatentReconstruction():
         return x
 
 
-    def reconstruct_test(self, x0, mu0, nb_iterations, ref_pet):
+
+    def z_step_test(self, x, z, mu, coeffs):
+
+        x = tf.Variable(x.reshape((1,) + x.shape), dtype=tf.float32)
+        mu = tf.Variable(mu.reshape((1,) + mu.shape), dtype=tf.float32)
+        with tf.GradientTape() as tape:
+
+            tape.watch(z)
+            # careful with the shape z and decoded
+            decoded = self.autoencoder.decoder(z) * coeffs
+            new_image = (x + mu) - decoded
+            squared = tf.math.square(new_image)
+            # squared = tf.math.multiply(decoded, decoded)
+            # product = tf.math.multiply(x + mu, decoded)
+
+        squared_gradient = tape.gradient(squared, z)
+        # product_gradient = tape.gradient(product, z)
+
+
+        update_term = self.rho/2 * (squared_gradient)
+
+        return z - self.step_size*update_term
+
+
+    def lagragian_step_test(self, x, z, mu, coeffs):
+        decoded = self.autoencoder.decoder(z).numpy() * coeffs
+        decoded = decoded.reshape(decoded.shape[1:])
+        # decoded = 1000 * np.ones_like(x) # <============== Test only
+        return mu + x - decoded
+
+
+    def reconstruct_test(self, x0, mu0, coeff, nb_iterations, ref_pet):
         *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
         x = x0
         mu = mu0
         z_pet_quality = []
+        coeffs = np.array([coeff, 1])
+        # pet_decoded = 1000*np.ones_like(x[:,:,0])
+        # mr_decoded = 1000*np.ones_like(x[:,:,1])
         for _ in range(nb_iterations):
 
-            decoded = self.decoding(z)
+            decoded = self.decoding(z) * coeffs
             pet_decoded = decoded[:,:,0]
             mr_decoded = decoded[:,:,1]
+
+
             x_pet = x[:, :, 0]
             new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
@@ -117,9 +152,9 @@ class DeepLatentReconstruction():
             new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
-            z = self.z_step(x, z, mu)
+            # z = self.z_step_test(x, z, mu, coeffs)
 
-            mu = self.lagragian_step(x, z, mu)
+            mu = self.lagragian_step_test(x, z, mu, coeffs)
 
             pet_ = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape[:-1])
             pet_error = np.sum(np.square(pet_ - ref_pet))
