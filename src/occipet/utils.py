@@ -276,3 +276,12 @@ def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float
     projected_image = fft2(image)
     intermediate = W*abs(projected_image - data)**2
     return np.sum(intermediate)
+
+
+def mse(im1, im2):
+    assert isinstance((im1, im2), np.ndarray), """Both images need to be numpy
+    arrays"""
+
+    assert im1.shape == im2.shape, "Both images must have the same dimensions"
+
+    return np.sum(np.square(im1 - im2))/im1.size
