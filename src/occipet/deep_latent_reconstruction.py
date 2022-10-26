@@ -156,76 +156,34 @@ class DLRtest(DeepLatentReconstruction):
         super().__init__(y_pet, y_mri, projector_id, autoencoder)
 
 
-    def pet_step(self, x, pet_decoded, mu):
-        _, sensitivity = back_projection(np.ones(self.y_pet.shape,), self.projector_id)
-        x_em = em_step(self.y_pet, x, self.projector_id, sensitivity)
-
-        square_root_term = (pet_decoded - mu -
-                            (sensitivity/self.rho[0]))**2 + (4*x_em*sensitivity)/self.rho[0]
-        # Diff avec la publi, c'est + sqrt et pas -
-        return 0.5*(pet_decoded - mu - (sensitivity/self.rho[0]) + np.sqrt(square_root_term))
-
-
-    def MR_step(self, mr_decoded, mu):
-
-        return (1/(self.rho[1] + self.mri_N)) * (self.mri_N * ifft2(self.y_mri)
-                                              + self.rho[1]*(mr_decoded - mu))
-
-
-    def z_step_test(self, x, z, mu, coeffs):
-
-        x = tf.Variable(x.reshape((1,) + x.shape), dtype=tf.float32)
-        mu = tf.Variable(mu.reshape((1,) + mu.shape), dtype=tf.float32)
-        with tf.GradientTape() as tape:
-
-            tape.watch(z)
-            # careful with the shape z and decoded
-            decoded = self.autoencoder.decoder(z) * coeffs
-            new_image = (x + mu) - decoded
-            squared = tf.math.square(new_image)
-            # squared = tf.math.multiply(decoded, decoded)
-            # product = tf.math.multiply(x + mu, decoded)
-
-        squared_gradient = tape.gradient(squared, z)
-        # product_gradient = tape.gradient(product, z)
-
-
-        update_term = (squared_gradient)
-
-        return z - self.step_size*update_term
-
-
-    def lagragian_step_test(self, x, z, mu, coeffs):
-        decoded = self.autoencoder.decoder(z).numpy() * coeffs
-        decoded = decoded.reshape(decoded.shape[1:])
-        return mu + x - decoded
-
-
-    def reconstruct(self, x0, mu0, coeff,  rho, step_size, nb_iterations, ref_pet):
+    def reconstruct(self, x0, mu0, rho, step_size, nb_iterations, ref_pet):
+        z_pet_quality = []
         self.rho = np.array(rho)
         self.step_size = step_size
+
         *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
         x = x0
         mu = mu0
-        z_pet_quality = []
-        coeffs = np.array([coeff, 1])
-        for _ in range(nb_iterations):
 
-            decoded = self.decoding(z) * coeffs
+        for _ in range(nb_iterations):
+            decoded = self.decoding(z)
+            coeffs = self.compute_coeffs(x, decoded)
+
+            decoded = decoded * coeffs
             pet_decoded = decoded[:,:,0]
             mr_decoded = decoded[:,:,1]
-
 
             x_pet = x[:, :, 0]
             new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
             new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
+
             new_x_mr = self.MR_step(mr_decoded, mu[:,:,1])
             new_x_mr = abs(new_x_mr.reshape(new_x_mr.shape + (1,)))
             x = np.concatenate((new_x_pet, new_x_mr), axis = 2)
 
-            z = self.z_step_test(x, z, mu, coeffs)
+            z = self.z_step(x, z, mu, coeffs)
 
-            mu = self.lagragian_step_test(x, z, mu, coeffs)
+            mu = self.lagragian_step(x, z, mu, coeffs)
 
             pet_ = self.autoencoder.decoder(z).numpy()[:,:,:,0].reshape(x.shape[:-1])
             pet_error = np.sum(np.square(pet_ - ref_pet))
