@@ -21,6 +21,7 @@ pandas = "^1.4.2"
 typer = "^0.4.1"
 setuptools = "^62.4.0"
 matplotlib = "^3.5.2"
+scikit-image = "^0.19.3"
 
 [tool.poetry.dev-dependencies]
 jupyterlab = "^3.4.3"

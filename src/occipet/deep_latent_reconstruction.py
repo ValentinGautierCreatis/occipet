@@ -18,6 +18,9 @@ class DeepLatentReconstruction():
         self.projector_id = projector_id
         self.autoencoder = autoencoder
         self.mri_N = 1 #(np.product(y_mri.shape))
+        self.xi = 1
+        self.tau = 2
+        self.u = 10
 
 
     def decoding(self, z):
@@ -148,6 +151,102 @@ class DeepLatentReconstruction():
                                  data_range=x[:,:,0].max()-x[:,:,0].min()))
 
         return x, points_pet, points_mr
+
+
+    def reconstruction_pet(self, xpet0, ref_mr, mu0, rho, step_size, nb_iterations):
+        self.rho = np.array(rho)
+        self.step_size = step_size
+
+        x0 = np.concatenate((xpet0, ref_mr), axis=2)
+        *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
+        x = x0
+        mu = mu0
+
+        for _ in range(nb_iterations):
+            decoded = self.decoding(z)
+            coeffs = self.compute_coeffs(x, decoded)
+
+            decoded = decoded * coeffs
+            pet_decoded = decoded[:,:,0]
+            # mr_decoded = decoded[:,:,1]
+
+            x_pet = x[:, :, 0]
+            new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
+            new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
+
+            x = np.concatenate((new_x_pet, ref_mr), axis = 2)
+
+            z = self.z_step(x, z, mu, coeffs)
+
+            mu = self.lagragian_step(x, z, mu, coeffs)
+
+        return x,z
+
+
+    def compute_primal_residual(self, x, z):
+        decoded_z = self.decoding(z)
+        norm = np.max([np.linalg.norm(x), np.linalg.norm(z)])
+
+        return (x - decoded_z) / norm
+
+
+    def compute_dual_residual(self, z_k1, z_k, mu):
+        decoded_z_k1 = self.decoding(z_k1)
+        decoded_z_k = self.decoding(z_k)
+        norm = np.linalg.norm(mu)
+
+        return (decoded_z_k1 - decoded_z_k) / norm
+
+
+    def rho_update(self, rho, primal_residual, dual_residual):
+        norm_primal = np.linalg.norm(primal_residual)
+        norm_dual = np.linalg.norm(dual_residual)
+
+        if norm_primal > self.xi * self.u * norm_dual:
+            return self.tau * rho
+
+        elif norm_dual > (self.u/self.xi) * norm_primal:
+            return rho / self.tau
+
+        else:
+            return rho
+
+
+    def test_reconstruction(self, xpet0, ref_mr, mu0, rho, step_size, nb_iterations):
+        self.rho = np.array(rho)
+        self.step_size = step_size
+
+        x0 = np.concatenate((xpet0, ref_mr), axis=2)
+        *_, z = self.autoencoder.encoder(x0.reshape((1,) + x0.shape))
+        x = x0
+        mu = mu0
+
+        for _ in range(nb_iterations):
+            decoded = self.decoding(z)
+            coeffs = self.compute_coeffs(x, decoded)
+
+            decoded = decoded * coeffs
+            pet_decoded = decoded[:,:,0]
+            # mr_decoded = decoded[:,:,1]
+
+            x_pet = x[:, :, 0]
+            new_x_pet = self.pet_step(x_pet, pet_decoded, mu[:,:,0])
+            new_x_pet = new_x_pet.reshape(new_x_pet.shape + (1,))
+
+            x = np.concatenate((new_x_pet, ref_mr), axis = 2)
+
+            old_z = np.array(z, copy=True)
+            z = self.z_step(x, z, mu, coeffs)
+
+            mu = self.lagragian_step(x, z, mu, coeffs)
+
+            primal_residual = self.compute_primal_residual(x, z)
+            dual_residual = self.compute_dual_residual(z, old_z, mu)
+
+            rho = self.rho_update(rho, primal_residual, dual_residual)
+
+        return x,z
+
 
 
 class DLRtest(DeepLatentReconstruction):
