@@ -6,6 +6,7 @@ import numpy as np
 from .utils import *
 from scipy.sparse.linalg import cg, LinearOperator
 from scipy.fft import ifft2, fft2
+from skimage.metrics import structural_similarity as ssim
 from functools import partial
 
 
@@ -150,7 +151,32 @@ def MLEM(y: np.ndarray, image_shape: np.ndarray,
 
     for _ in range(nb_iterations):
         image = em_step(y, image, projector_id, norm)
-    return image[1:-1,:]
+    image[0,:] = image[-1,:] = 0
+    return image
+
+
+def MLEM_eval(y: np.ndarray, image_shape: np.ndarray,
+              nb_iterations: int, projector_id: int,
+              ref_pet: np.ndarray):
+
+    image = np.ones(image_shape)
+    _, norm = back_projection(np.ones(y.shape), projector_id)
+    assert norm.shape == image_shape, \
+        "The image shape is different from the one specified by the projector"
+
+    list_keys = ["mse", "ssim"]
+    points_pet = dict((k, list()) for k in list_keys)
+
+    for _ in range(nb_iterations):
+        image = em_step(y, image, projector_id, norm)
+        corrected = np.array(image, copy=True)
+        corrected[0,:] = corrected[-1,:] = 0
+        points_pet["mse"].append(mse(corrected/corrected.max(), ref_pet))
+        points_pet["ssim"].append(ssim(image/image.max(), ref_pet,
+                                data_range=image.max()-image.min()))
+
+    image[0,:] = image[-1,:] = 0
+    return image, points_pet
 
 
 def EMTV(y: np.ndarray, image_shape: np.ndarray,
