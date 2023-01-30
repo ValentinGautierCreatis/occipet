@@ -281,4 +281,5 @@ def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float
 def mse(im1, im2):
     assert im1.shape == im2.shape, "Both images must have the same dimensions"
 
-    return np.sum(np.square(im1 - im2))/im1.size
+    # return np.sum(np.square(im1 - im2))/im1.size
+    return np.sqrt(np.sum(np.square(im1 - im2))/im1.size)/np.mean(im1)
