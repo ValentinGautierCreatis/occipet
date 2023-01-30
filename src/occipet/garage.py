@@ -135,7 +135,7 @@ def evaluate():
     mlem_iterations = 15
     nb_photons = 2 * 10**5
     ####### TO TUNE ######
-    S = 0.0005
+    S = 0.001
     ######################
 
 
@@ -144,6 +144,8 @@ def evaluate():
     mu_2d = np.zeros(np.expand_dims(pet_image, axis=-1).shape)
 
     y_pet, projector_id = load_data.generate_pet_data_from_image(pet_image, 0.01, 60, nb_photons)
+    # y_pet, projector_id = load_data.generate_pet_data_from_image(pet_image, 0.5, 200, 12**6)
+
     y_mr, sigma = load_data.generate_t1_mr_data_from_image(mri_image, 0.03)
 
     x_init_pet = reconstruction.MLEM(y_pet, pet_image.shape, nb_init_steps, projector_id)
