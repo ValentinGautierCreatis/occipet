@@ -171,7 +171,7 @@ def MLEM_eval(y: np.ndarray, image_shape: np.ndarray,
         image = em_step(y, image, projector_id, norm)
         corrected = np.array(image, copy=True)
         corrected[0,:] = corrected[-1,:] = 0
-        points_pet["mse"].append(mse(corrected/corrected.max(), ref_pet))
+        points_pet["mse"].append(mse(ref_pet, corrected/corrected.max()))
         points_pet["ssim"].append(ssim(image/image.max(), ref_pet,
                                 data_range=image.max()-image.min()))
 

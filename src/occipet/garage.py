@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import numpy as np
+import occipet.load_data as load_data
+from occipet import reconstruction
+from occipet import utils
 
 import matplotlib.pyplot as plt
 from occipet.reconstruction import em_step
 from .utils import *
 from skimage.metrics import structural_similarity as ssim
 import tensorflow as tf
+from deep_learning.variational_auto_encoder import VariationalAutoEncoder
 
 def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size, nb_iterations):
     xpet0_normalized = xpet0/xpet0.max()
@@ -15,16 +19,18 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
     x = x0
     mu = mu0
     rho = np.array(rho)
+    constraint_distance_old = np.sum((x[:,:,0] - np.squeeze(model.decoder(z).numpy(), axis=0)[:,:,0])**2)
 
     xi = 1
     u = 10
     tau = 1
     tau_max = 100
+    # rho_max = 10
 
     list_keys = ["mse", "ssim", "fidelity", "constraint"]
     points_pet = dict((k, list()) for k in list_keys)
 
-    points_pet["mse"].append(mse(np.squeeze(xpet0, axis=-1), np.squeeze(ref_pet, axis=-1)))
+    points_pet["mse"].append(mse(np.squeeze(ref_pet, axis=-1), np.squeeze(xpet0, axis=-1)))
     for _ in range(nb_iterations):
         old_z = np.array(z, copy=True)
         decoded = np.squeeze(model.decoder(z).numpy(), axis=0)
@@ -33,9 +39,10 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
         pet_decoded = decoded[:,:,0]
 
         # print(rho)
-        plt.imshow(decoded[:,:,0]/coeffs[0])
-        plt.colorbar()
-        plt.show()
+        # plt.imshow(x[:,:,0])
+        # plt.imshow(decoded[:,:,0]/coeffs[0])
+        # plt.colorbar()
+        # plt.show()
 
         # PET STEP =========================================
         x_pet = x[:,:,0]
@@ -85,17 +92,128 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
             tau = tau_max
 
         #RHO UPDATE
+        update_factor = 1
         if norm_primal > xi * u * norm_dual:
-            rho = tau * rho
+            # rho = min(tau * rho, rho_max)
+            rho = rho * tau
+            update_factor = tau
         elif norm_dual > (u/xi) * norm_primal:
+            # rho = min(rho/tau, rho_max)
             rho = rho/tau
+            update_factor = 1/tau
 
+        mu[:,:,0] = mu[:,:,0]/update_factor
+
+
+        # STOPPING CRITERION
+        eps_rel = 0.02
+        if norm_primal <= eps_rel and norm_dual <= eps_rel:
+            break
 
         #PLOTS
-        points_pet["mse"].append(mse(new_xpet, np.squeeze(ref_pet, axis=-1)))
+        # print(np.mean(np.squeeze(ref_pet, axis=-1)))
+        points_pet["mse"].append(mse(np.squeeze(ref_pet, axis=-1), new_xpet/coeffs[0]))
         points_pet["ssim"].append(ssim(new_xpet, np.squeeze(ref_pet, axis=-1),
                                     data_range=new_xpet.max()))
         points_pet["fidelity"].append(data_fidelity_pet(x[:,:,0], y_pet, projector_id))
         points_pet["constraint"].append(np.sum((x[:,:,0] - decoded[:,:,0])**2))
 
     return x, points_pet
+
+
+def evaluate():
+    path_to_data = "/home/gautier/data/all_patients_train.npy"
+    path_to_model = "/home/gautier/Modèles/bimodal_v2/"
+    index = 670
+
+    data = np.load(path_to_data)
+    model = VariationalAutoEncoder((256,256,2), 64)
+    model.load_weights(path_to_model)
+
+    nb_iterations = 40
+    nb_init_steps = 10
+    mlem_iterations = 15
+    nb_photons = 2 * 10**5
+    ####### TO TUNE ######
+    S = 0.0005
+    ######################
+
+
+    pet_image = data[index, :, :, 0]
+    mri_image = data[index, :, :, 1]
+    mu_2d = np.zeros(np.expand_dims(pet_image, axis=-1).shape)
+
+    y_pet, projector_id = load_data.generate_pet_data_from_image(pet_image, 0.01, 60, nb_photons)
+    y_mr, sigma = load_data.generate_t1_mr_data_from_image(mri_image, 0.03)
+
+    x_init_pet = reconstruction.MLEM(y_pet, pet_image.shape, nb_init_steps, projector_id)
+    x_init_pet = x_init_pet.reshape(x_init_pet.shape + (1,))
+
+    x_init_mr = abs(ifft2(y_mr))
+    x_init_mr = x_init_mr.reshape(x_init_mr.shape + (1,))/x_init_mr.max()
+
+    test_rho = [1/np.sum(x_init_pet), 0.2]
+
+    # coeff = x_init_pet.mean()/data[index,:,:,0].mean()
+    x, points_pet = dlr(y_pet, projector_id, x_init_pet, data[index,:,:,:1], data[index,:,:,1:], mu_2d, model, test_rho[0], S*10, nb_iterations)
+    ref_mlem = reconstruction.MLEM(y_pet, x_init_pet.shape[:2], mlem_iterations, projector_id)
+    mse_mlem = utils.mse(data[index,:,:,0], ref_mlem/ref_mlem.mean() * data[index,:,:,0].mean())
+
+    return x, points_pet, mse_mlem
+
+
+def evaluation(nb_photons, S):
+
+    indexes = [670, 25, 74, 127, 294, 425, 696, 731, 521]
+    # indexes = [0, 12, 15, 22, 24, 25, 26, 30, 32, 38, 61, 68]
+    keys = ["mse", "ssim"]
+    metrics_dlr = dict((k, list()) for k in keys)
+    metrics_mlem = dict((k, list()) for k in keys)
+
+    path_to_data = "/home/gautier/data/all_patients_train.npy"
+    path_to_model = "/home/gautier/Modèles/bimodal_v2/"
+    index = 25
+
+    data = np.load(path_to_data)
+    model = VariationalAutoEncoder((256,256,2), 64)
+    model.load_weights(path_to_model)
+
+    nb_iterations = 40
+    nb_init_steps = 10
+    mlem_iterations = 15
+
+    for index in indexes:
+
+        pet_image = data[index, :, :, 0]
+        mri_image = data[index, :, :, 1]
+        mu_2d = np.zeros(np.expand_dims(pet_image, axis=-1).shape)
+
+        y_pet, projector_id = load_data.generate_pet_data_from_image(pet_image, 0.01, 60, nb_photons)
+        y_mr, sigma = load_data.generate_t1_mr_data_from_image(mri_image, 0.03)
+
+        x_init_pet = reconstruction.MLEM(y_pet, pet_image.shape, nb_init_steps, projector_id)
+        x_init_pet = x_init_pet.reshape(x_init_pet.shape + (1,))
+
+        x_init_mr = abs(ifft2(y_mr))
+        x_init_mr = x_init_mr.reshape(x_init_mr.shape + (1,))/x_init_mr.max()
+
+        test_rho = [1/np.sum(x_init_pet), 0.2]
+
+        # coeff = x_init_pet.mean()/data[index,:,:,0].mean()
+        x, p = dlr(y_pet, projector_id, x_init_pet, data[index,:,:,:1], data[index,:,:,1:], mu_2d, model, test_rho[0], S*10, nb_iterations)
+        x = x[:,:,0]/x[:,:,0].max()
+        plt.imshow(x)
+        plt.show()
+        ref_mlem = reconstruction.MLEM(y_pet, x_init_pet.shape[:2], mlem_iterations, projector_id)
+        ref_mlem = ref_mlem/ref_mlem.max()
+        mse_mlem = utils.mse(data[index,:,:,0], ref_mlem)
+        ssim_mlem = ssim(ref_mlem, data[index,:,:,0], data_range=ref_mlem.max())
+
+        metrics_dlr["mse"].append(utils.mse(data[index, :,:,0], x))
+        metrics_dlr["ssim"].append(ssim(x, data[index,:,:,0], data_range=x.max()))
+
+        metrics_mlem["mse"].append(mse_mlem)
+        metrics_mlem["ssim"].append(ssim_mlem)
+
+    metrics = {"mlem": metrics_mlem, "dlr": metrics_dlr}
+    return metrics
