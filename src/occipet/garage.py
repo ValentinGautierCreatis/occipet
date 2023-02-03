@@ -5,6 +5,7 @@ from occipet import reconstruction
 from occipet import utils
 
 import matplotlib.pyplot as plt
+import random
 from occipet.reconstruction import em_step
 from .utils import *
 from skimage.metrics import structural_similarity as ssim
@@ -19,7 +20,6 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
     x = x0
     mu = mu0
     rho = np.array(rho)
-    constraint_distance_old = np.sum((x[:,:,0] - np.squeeze(model.decoder(z).numpy(), axis=0)[:,:,0])**2)
 
     xi = 1
     u = 10
@@ -39,10 +39,10 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
         pet_decoded = decoded[:,:,0]
 
         # print(rho)
-        # plt.imshow(x[:,:,0])
-        # plt.imshow(decoded[:,:,0]/coeffs[0])
-        # plt.colorbar()
-        # plt.show()
+        plt.imshow(x[:,:,0])
+        plt.imshow(decoded[:,:,0]/coeffs[0])
+        plt.colorbar()
+        plt.show()
 
         # PET STEP =========================================
         x_pet = x[:,:,0]
@@ -73,7 +73,7 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
 
         # RESIDUALS
         #
-        normalisation_primal = np.max([np.linalg.norm(x[:,:,0]), np.linalg.norm(decoded[:,:0])])
+        normalisation_primal = np.max([np.linalg.norm(x[:,:,0]), np.linalg.norm(decoded[:,:,0])])
         norm_primal = np.linalg.norm( (x - decoded)[:,:,0]/normalisation_primal )
 
         decoded_zk = np.squeeze(model.decoder(old_z).numpy(), axis=0)
@@ -122,6 +122,7 @@ def dlr(y_pet, projector_id, xpet0, ref_pet, ref_mr, mu0, model, rho, step_size,
 
 
 def evaluate():
+    random.seed(10)
     path_to_data = "/home/gautier/data/all_patients_train.npy"
     path_to_model = "/home/gautier/Modèles/bimodal_v2/"
     index = 670
@@ -154,7 +155,8 @@ def evaluate():
     x_init_mr = abs(ifft2(y_mr))
     x_init_mr = x_init_mr.reshape(x_init_mr.shape + (1,))/x_init_mr.max()
 
-    test_rho = [1/np.sum(x_init_pet), 0.2]
+    # test_rho = [1/np.sum(x_init_pet), 0.2]
+    test_rho = [1/np.sum(y_pet), 0.2]
 
     # coeff = x_init_pet.mean()/data[index,:,:,0].mean()
     x, points_pet = dlr(y_pet, projector_id, x_init_pet, data[index,:,:,:1], data[index,:,:,1:], mu_2d, model, test_rho[0], S*10, nb_iterations)
