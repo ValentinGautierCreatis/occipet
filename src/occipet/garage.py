@@ -43,7 +43,7 @@ def dlr(
     points_pet = dict((k, list()) for k in list_keys)
 
     points_pet["mse"].append(
-        mse(np.squeeze(ref_pet, axis=-1), np.squeeze(xpet0, axis=-1))
+        nrmse(np.squeeze(ref_pet, axis=-1), np.squeeze(xpet0, axis=-1))
     )
     for _ in range(nb_iterations):
         old_z = np.array(z, copy=True)
@@ -131,7 +131,7 @@ def dlr(
         # PLOTS
         # print(np.mean(np.squeeze(ref_pet, axis=-1)))
         points_pet["mse"].append(
-            mse(np.squeeze(ref_pet, axis=-1), new_xpet / coeffs[0])
+            nrmse(np.squeeze(ref_pet, axis=-1), new_xpet / coeffs[0])
         )
         points_pet["ssim"].append(
             ssim(new_xpet, np.squeeze(ref_pet, axis=-1), data_range=new_xpet.max())
@@ -200,7 +200,7 @@ def evaluate():
     ref_mlem = reconstruction.MLEM(
         y_pet, x_init_pet.shape[:2], mlem_iterations, projector_id
     )
-    mse_mlem = utils.mse(
+    mse_mlem = utils.nrmse(
         data[index, :, :, 0], ref_mlem / ref_mlem.mean() * data[index, :, :, 0].mean()
     )
 
@@ -266,10 +266,10 @@ def evaluation(nb_photons, S):
             y_pet, x_init_pet.shape[:2], mlem_iterations, projector_id
         )
         ref_mlem = ref_mlem / ref_mlem.max()
-        mse_mlem = utils.mse(data[index, :, :, 0], ref_mlem)
+        mse_mlem = utils.nrmse(data[index, :, :, 0], ref_mlem)
         ssim_mlem = ssim(ref_mlem, data[index, :, :, 0], data_range=ref_mlem.max())
 
-        metrics_dlr["mse"].append(utils.mse(data[index, :, :, 0], x))
+        metrics_dlr["mse"].append(utils.nrmse(data[index, :, :, 0], x))
         metrics_dlr["ssim"].append(ssim(x, data[index, :, :, 0], data_range=x.max()))
 
         metrics_mlem["mse"].append(mse_mlem)

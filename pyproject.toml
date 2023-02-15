@@ -33,6 +33,7 @@ pyright = "^1.1.292"
 black = "^23.1.0"
 flake8 = "^6.0.0"
 jupyterlab = "^3.4.3"
+pytest = "^7.2.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

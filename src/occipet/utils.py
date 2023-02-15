@@ -4,9 +4,9 @@ import astra
 import numpy as np
 from scipy.fft import fft2, ifft2, fftshift, ifftshift
 
-def create_projector(shape: tuple[int, int],
-                     angles: np.ndarray, gpu: int) -> int:
-    """ Create a projector for the given geometry
+
+def create_projector(shape: tuple[int, int], angles: np.ndarray, gpu: int) -> int:
+    """Create a projector for the given geometry
 
     :param shape: shape of the images in 2D
     :type shape: tuple[int, int]
@@ -22,15 +22,15 @@ def create_projector(shape: tuple[int, int],
     proj_geom = astra.create_proj_geom("parallel", 1, max(shape), angles)
 
     if gpu is None:
-        projector_id = astra.create_projector('line', proj_geom, vol_geom)
+        projector_id = astra.create_projector("line", proj_geom, vol_geom)
     else:
-        projector_id = astra.create_projector('cuda', proj_geom, vol_geom)
+        projector_id = astra.create_projector("cuda", proj_geom, vol_geom)
 
     return projector_id
 
 
 def div_zer(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """ Performs element wise division between 2 arrays
+    """Performs element wise division between 2 arrays
 
     :param a: numerator array
     :type a: np.ndarray
@@ -40,19 +40,19 @@ def div_zer(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
     """
     assert a.shape == b.shape, "both matrix should be the same size"
-    epsilon = 10**(-12)
+    epsilon = 10 ** (-12)
     size = a.shape
     new = np.zeros(size)
-    non_zero = (b != 0)
-    new[non_zero] = a[non_zero]/b[non_zero]
+    non_zero = b != 0
+    new[non_zero] = a[non_zero] / b[non_zero]
     # new = a/(b+epsilon)
     return new
 
 
-def forward_projection(x: np.ndarray,
-                       projector_id: int, gpu: int = None
-                       ) -> tuple[int, np.ndarray]:
-    """ Forward projection using astra
+def forward_projection(
+    x: np.ndarray, projector_id: int, gpu: int = None
+) -> tuple[int, np.ndarray]:
+    """Forward projection using astra
 
     :param x: data on which is applied the forward projection
     :type x: np.ndarray
@@ -66,9 +66,8 @@ def forward_projection(x: np.ndarray,
     return astra.creators.create_sino(x, projector_id, gpuIndex=gpu)
 
 
-def back_projection(y: np.ndarray, projector_id: int
-                    ) -> tuple[int, np.ndarray]:
-    """ Back projection using astra
+def back_projection(y: np.ndarray, projector_id: int) -> tuple[int, np.ndarray]:
+    """Back projection using astra
 
     :param y: data on which is applied the retroprojection
     :type y: np.ndarray
@@ -80,8 +79,8 @@ def back_projection(y: np.ndarray, projector_id: int
     return astra.creators.create_backprojection(y, projector_id)
 
 
-def gradient(a) -> np.ndarray :
-    '''
+def gradient(a) -> np.ndarray:
+    """
     Compute gradient of a
 
     Parameters
@@ -93,24 +92,30 @@ def gradient(a) -> np.ndarray :
     -------
     grad : cp.array
            gradient(a)
-    '''
+    """
     dim = len(a.shape)
-    if dim == 2 :
-        grad = np.zeros((dim,a.shape[0],a.shape[1]), dtype=a.dtype)
-        grad[0] = np.diff(a,1,axis=0,append=a[-1,:].reshape(1,a.shape[1]))
-        grad[1] = np.diff(a,1,axis=1,append=a[:,-1].reshape(a.shape[0],1))
-    elif dim == 3 :
-        grad = np.zeros((3,a.shape[0],a.shape[1],a.shape[2]))
-        grad[0] = np.diff(a,1,axis=0,append=a[-1,:,:].reshape(1,a.shape[1],a.shape[2]))
-        grad[1] = np.diff(a,1,axis=1,append=a[:,-1,:].reshape(a.shape[0],1,a.shape[2]))
-        grad[2] = np.diff(a,1,axis=2,append=a[:,:,-1].reshape(a.shape[0],a.shape[1],1))
+    if dim == 2:
+        grad = np.zeros((dim, a.shape[0], a.shape[1]), dtype=a.dtype)
+        grad[0] = np.diff(a, 1, axis=0, append=a[-1, :].reshape(1, a.shape[1]))
+        grad[1] = np.diff(a, 1, axis=1, append=a[:, -1].reshape(a.shape[0], 1))
+    elif dim == 3:
+        grad = np.zeros((3, a.shape[0], a.shape[1], a.shape[2]))
+        grad[0] = np.diff(
+            a, 1, axis=0, append=a[-1, :, :].reshape(1, a.shape[1], a.shape[2])
+        )
+        grad[1] = np.diff(
+            a, 1, axis=1, append=a[:, -1, :].reshape(a.shape[0], 1, a.shape[2])
+        )
+        grad[2] = np.diff(
+            a, 1, axis=2, append=a[:, :, -1].reshape(a.shape[0], a.shape[1], 1)
+        )
     else:
         raise IndexError(f"Unvalid dimension {dim} for a. Must be 2 or 3")
     return grad
 
 
-def gradient_div(a) :
-    '''
+def gradient_div(a):
+    """
     Compute gradient of a used in divergence
 
     Parameters
@@ -122,20 +127,27 @@ def gradient_div(a) :
     -------
     grad : cp.array
            gradient(a)
-    '''
+    """
     dim = len(a.shape)
-    if dim == 2 :
-        grad = np.zeros((2,a.shape[0],a.shape[1]), dtype=a.dtype)
-        grad[0] = np.diff(a,1,axis=0,prepend=a[0,:].reshape(1,a.shape[1]))
-        grad[1] = np.diff(a,1,axis=1,prepend=a[:,0].reshape(a.shape[0],1))
-    elif dim == 3 :
-        grad = np.zeros((3,a.shape[0],a.shape[1],a.shape[2]))
-        grad[0] = np.diff(a,1,axis=0,prepend=a[0,:,:].reshape(1,a.shape[1],a.shape[2]))
-        grad[1] = np.diff(a,1,axis=1,prepend=a[:,0,:].reshape(a.shape[0],1,a.shape[2]))
-        grad[2] = np.diff(a,1,axis=2,prepend=a[:,:,0].reshape(a.shape[0],a.shape[1],1))
+    if dim == 2:
+        grad = np.zeros((2, a.shape[0], a.shape[1]), dtype=a.dtype)
+        grad[0] = np.diff(a, 1, axis=0, prepend=a[0, :].reshape(1, a.shape[1]))
+        grad[1] = np.diff(a, 1, axis=1, prepend=a[:, 0].reshape(a.shape[0], 1))
+    elif dim == 3:
+        grad = np.zeros((3, a.shape[0], a.shape[1], a.shape[2]))
+        grad[0] = np.diff(
+            a, 1, axis=0, prepend=a[0, :, :].reshape(1, a.shape[1], a.shape[2])
+        )
+        grad[1] = np.diff(
+            a, 1, axis=1, prepend=a[:, 0, :].reshape(a.shape[0], 1, a.shape[2])
+        )
+        grad[2] = np.diff(
+            a, 1, axis=2, prepend=a[:, :, 0].reshape(a.shape[0], a.shape[1], 1)
+        )
     else:
         raise IndexError("Unvalid dimension for a. Must be 2 or 3")
     return grad
+
 
 # def gradient(x):
 #     return np.array(np.gradient(x))
@@ -144,16 +156,16 @@ def gradient_div(a) :
 
 
 def div_2d(q: list) -> np.ndarray:
-    """ Computes the divergence of a 2D vector field
+    """Computes the divergence of a 2D vector field
 
     :param q: 2D vector field represented as a list of two 2D matrices. (Ax(x,y), Ay(x,y))
     :type q: list
     :returns: The divergence of this vector field represented as a 2D ndarray.
 
     """
-    grad1=gradient_div(q[0])
-    grad2=gradient_div(q[1])
-    return grad1[0]+grad2[1]
+    grad1 = gradient_div(q[0])
+    grad2 = gradient_div(q[1])
+    return grad1[0] + grad2[1]
 
 
 def merhanian_A_matrix(rho: float, W: float, image: np.ndarray) -> np.ndarray:
@@ -172,8 +184,9 @@ def merhanian_A_matrix(rho: float, W: float, image: np.ndarray) -> np.ndarray:
     return ifft2(W * fft2(image)) - rho * div_2d(list(gradient(image)))
 
 
-def A_matrix_from_flatten(shape_image: np.ndarray, rho: float,
-                          W: float, flat_image: np.ndarray) -> np.ndarray:
+def A_matrix_from_flatten(
+    shape_image: np.ndarray, rho: float, W: float, flat_image: np.ndarray
+) -> np.ndarray:
     """Takes the input image as a vector and compute the effect of the A
     matrix of the system in equation (21)
 
@@ -201,7 +214,7 @@ def generalized_l2_norm_squared(vector: np.ndarray) -> float:
     :returns: the Froebenius norm
 
     """
-    return np.sum(abs(vector)**2)
+    return np.sum(abs(vector) ** 2)
 
 
 def co_norm(u: np.ndarray, v: np.ndarray) -> np.ndarray:
@@ -215,14 +228,12 @@ def co_norm(u: np.ndarray, v: np.ndarray) -> np.ndarray:
     :returns: A matrix representing the co norm computed on each voxel
 
     """
-    u_norm_squared = np.sum(abs(u)**2, axis=0)
-    v_norm_squared = np.sum(abs(v)**2, axis=0)
-    return np.sqrt(u_norm_squared+v_norm_squared)
+    u_norm_squared = np.sum(abs(u) ** 2, axis=0)
+    v_norm_squared = np.sum(abs(v) ** 2, axis=0)
+    return np.sqrt(u_norm_squared + v_norm_squared)
 
 
-def multiply_along_0axis(multiplier: np.ndarray, multiplied: np.ndarray
-                         ) -> np.ndarray:
-
+def multiply_along_0axis(multiplier: np.ndarray, multiplied: np.ndarray) -> np.ndarray:
     """Take a matrix and multiply each element of an array of matrix of same
     dimension by this matrix
 
@@ -239,8 +250,7 @@ def multiply_along_0axis(multiplier: np.ndarray, multiplied: np.ndarray
     return new
 
 
-def data_fidelity_pet(image: np.ndarray, data: np.ndarray, projector_id: int
-                      ) -> float:
+def data_fidelity_pet(image: np.ndarray, data: np.ndarray, projector_id: int) -> float:
     """Compute the data fidelity term for pet data as in
     equation (5) of Merhanian's paper
 
@@ -259,8 +269,7 @@ def data_fidelity_pet(image: np.ndarray, data: np.ndarray, projector_id: int
     return np.sum(intermediate)
 
 
-def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float
-                      ) -> float:
+def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float) -> float:
     """Compute the data fidelity term for mri data as in
     equation (6) of Merhanian's paper
 
@@ -274,12 +283,56 @@ def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float
 
     """
     projected_image = fft2(image)
-    intermediate = W*abs(projected_image - data)**2
+    intermediate = W * abs(projected_image - data) ** 2
     return np.sum(intermediate)
 
 
-def mse(im1, im2):
+def nrmse(im1, im2):
+    """Computes the NRMSE between im1 and im2
+
+    Parameters
+    ----------
+    im1 : np.ndarray
+        The reference image
+    im2 : np.ndarray
+        The obtained image
+
+    """
     assert im1.shape == im2.shape, "Both images must have the same dimensions"
 
     # return np.sum(np.square(im1 - im2))/im1.size
-    return np.sqrt(np.sum(np.square(im1 - im2))/im1.size)/np.mean(im1)
+    return np.sqrt(np.sum(np.square(im1 - im2)) / im1.size) / np.mean(im1)
+
+
+def add_gaussian_noise(image, psnr=20):
+    image_power = np.sum(image**2) / image.size
+    image_power_db = 10 * np.log10(image_power)
+
+    noise_power_db = image_power_db - psnr
+    noise_power = 10 ** (noise_power_db / 10)
+
+    noise = np.random.normal(0, 1, image.shape) * np.sqrt(noise_power)
+
+    return image + noise
+
+
+def normalize_meanstd(a, axis=None) -> np.ndarray:
+    """Returns the standardized version of the input array along desired axes
+
+    Parameters
+    ----------
+    a : np.ndarray
+        The array to be standardized
+    axis : int, tuple
+        Axes along which to perform reduction
+
+    Returns
+    -------
+    np.ndarray
+        Standardized array
+
+    """
+    # axis param denotes axes along which mean & std reductions are to be performed
+    mean = np.mean(a, axis=axis, keepdims=True)
+    std = np.sqrt(((a - mean) ** 2).mean(axis=axis, keepdims=True))
+    return (a - mean) / std

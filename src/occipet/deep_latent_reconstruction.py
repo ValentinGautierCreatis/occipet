@@ -25,6 +25,8 @@ class DeepLatentReconstruction:
         self.y_pet: np.ndarray
         self.y_mr: np.ndarray
         self.projector_id: int
+        self.nb_steps: int
+        self.eps_rel: float
 
     def pet_step(self, current, pet_decoded, mu):
         _, sensitivity = back_projection(np.ones(self.y_pet.shape), self.projector_id)
@@ -168,15 +170,16 @@ class DeepLatentReconstruction:
         return x  # [:,:,0]
 
     def pet_reconstruction_metrics(
-        self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size
+            self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
     ):
         # Initializations
-        nb_steps = 40
+        self.nb_steps = nb_steps
         self.step_size = step_size
         self.y_pet = y_pet
         self.projector_id = projector_id
         x_pet0_normalized = x_pet0 / x_pet0.max()
         ref_mr_normalized = ref_mr / ref_mr.max()
+        self.eps_rel = eps_rel
         x0_normalized = np.concatenate(
             (
                 np.expand_dims(x_pet0_normalized, axis=-1),
@@ -193,7 +196,7 @@ class DeepLatentReconstruction:
         self.rho_pet = 1 / np.sum(y_pet)
 
         # Initializing metrics
-        list_keys = ["mse", "ssim", "fidelity", "constraint"]
+        list_keys = ["nrmse", "ssim", "fidelity", "constraint"]
         points_pet = dict((k, list()) for k in list_keys)
 
         # Begining of the algo
@@ -206,7 +209,7 @@ class DeepLatentReconstruction:
             x_pet = x[:, :, 0]
             decoded = self.decoding(z)
             decoded = decoded * self.compute_coeffs(x, decoded)
-            points_pet["mse"].append(mse(ref_pet, x_pet / self.coeffs[0]))
+            points_pet["nrmse"].append(nrmse(ref_pet, x_pet / self.coeffs[0]))
             points_pet["ssim"].append(ssim(x_pet, ref_pet, data_range=x_pet.max()))
             points_pet["fidelity"].append(data_fidelity_pet(x_pet, y_pet, projector_id))
             points_pet["constraint"].append(np.sum((x_pet - decoded[:, :, 0]) ** 2))
