@@ -27,13 +27,13 @@ astra-toolbox = "^1.8b5"
 [tool.poetry.scripts]
 occipet = "occipet.app:app"
 deep_learning = "deep_learning.app:app"
-pyright = "^1.1.292"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
 flake8 = "^6.0.0"
 jupyterlab = "^3.4.3"
 pytest = "^7.2.1"
+pyright = "^1.1.292"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
