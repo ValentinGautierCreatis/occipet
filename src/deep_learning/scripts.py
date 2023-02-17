@@ -13,12 +13,12 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
                 validation_split=0.0,
                 tensorboard=False) -> None:
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_path,
+        filepath=pathlib.Path(checkpoint_path) / "checkpoint",
         # save_weights_only=True,
         # verbose=1
     )
 
-    log_dir = str(pathlib.Path(checkpoint_path) / ".." / "logs" /
+    log_dir = str(pathlib.Path(checkpoint_path) / "logs" /
                   datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
