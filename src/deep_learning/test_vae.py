@@ -26,9 +26,9 @@ class Encoder(layers.Layer):
         super(Encoder, self).__init__(name=name, **kwargs)
         self.conv = keras.Sequential([ConvBlock(32), ConvBlock(64)])
         self.flatten = layers.Flatten()
-        self.dense = layers.Dense(64)
-        self.dense_mean = layers.Dense(latent_dim)
-        self.dense_log_var = layers.Dense(latent_dim)
+        self.dense = layers.Dense(64, kernel_initializer="zeros")
+        self.dense_mean = layers.Dense(latent_dim, kernel_initializer="zeros")
+        self.dense_log_var = layers.Dense(latent_dim, kernel_initializer="zeros")
         self.sampling = Sampling()
 
     def call(self, inputs):
