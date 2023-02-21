@@ -99,7 +99,7 @@ class ConvBlock(keras.layers.Layer):
 
     def call(self, x):
         xhat = self.conv(x)
-        xhat = self.normalize(xhat)
+        # xhat = self.normalize(xhat)
         xhat = self.activation(xhat)
         return xhat
 
