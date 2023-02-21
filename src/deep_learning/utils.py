@@ -116,6 +116,6 @@ class DeconvBlock(keras.layers.Layer):
 
     def call(self, x):
         xhat = self.deconv(x)
-        xhat = self.normalize(xhat)
+        # xhat = self.normalize(xhat)
         xhat = self.activation(xhat)
         return xhat
