@@ -159,7 +159,7 @@ class VariationalAutoEncoder(tf.keras.Model):
 
 
 class BetaVAE(VariationalAutoEncoder):
-  def __init__(self, original_dim, latent_dim=32, beta=1, name='autoencoder',
+  def __init__(self, original_dim=(256,256,2), latent_dim=32, beta=1, name='autoencoder',
                **kwargs):
     super().__init__(original_dim, latent_dim, name, **kwargs)
     self.beta = beta
