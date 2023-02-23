@@ -5,6 +5,7 @@ from keras.layers import (
     Conv2D,
     Conv2DTranspose,
     LeakyReLU,
+    ReLU,
     BatchNormalization,
     MaxPool2D,
 )
@@ -99,7 +100,7 @@ class ConvBlock(keras.layers.Layer):
 
     def call(self, x):
         xhat = self.conv(x)
-        # xhat = self.normalize(xhat)
+        xhat = self.normalize(xhat)
         xhat = self.activation(xhat)
         return xhat
 
@@ -116,6 +117,6 @@ class DeconvBlock(keras.layers.Layer):
 
     def call(self, x):
         xhat = self.deconv(x)
-        # xhat = self.normalize(xhat)
+        xhat = self.normalize(xhat)
         xhat = self.activation(xhat)
         return xhat
