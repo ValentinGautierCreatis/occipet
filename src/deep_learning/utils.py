@@ -120,3 +120,9 @@ class DeconvBlock(keras.layers.Layer):
         xhat = self.normalize(xhat)
         xhat = self.activation(xhat)
         return xhat
+
+
+def compute_kl(z_mean, z_log_var):
+    kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+    kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+    return kl_loss

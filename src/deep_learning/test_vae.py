@@ -71,7 +71,7 @@ class Encoder(layers.Layer):
             ]
         )
         self.flatten = layers.Flatten()
-        self.dense = layers.Dense(128)
+        # self.dense = layers.Dense(128)
         self.dense_mean = layers.Dense(latent_dim)
         self.dense_log_var = layers.Dense(latent_dim)
         self.sampling = Sampling()
@@ -89,7 +89,7 @@ class Encoder(layers.Layer):
 class Decoder(layers.Layer):
     """Converts z, the encoded digit vector, back into a readable digit."""
 
-    def __init__(self, shape_before_flatten, name="decoder", **kwargs):
+    def __init__(self, shape_before_flatten, nb_channels=2, name="decoder", **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)
         self.dense = layers.Dense(np.prod(shape_before_flatten))
         self.reshape = layers.Reshape(target_shape=(shape_before_flatten))
@@ -98,7 +98,7 @@ class Decoder(layers.Layer):
                 DeconvBlock(64),
                 DeconvBlock(32),
                 layers.Conv2DTranspose(
-                    filters=2, kernel_size=3, strides=1, padding="same"
+                    filters=nb_channels, kernel_size=3, strides=1, padding="same"
                 ),
             ]
         )
@@ -111,12 +111,13 @@ class Decoder(layers.Layer):
 
 
 class Vae(tf.keras.Model):
-    def __init__(self, latent_dim=32, beta=1.0, sparse=False, name="vae", **kwargs):
+    def __init__(self, original_shape=(256,256,2), latent_dim=32, beta=1.0, sparse=False, name="vae", **kwargs):
         super(Vae, self).__init__(name=name, **kwargs)
         self.beta = beta
         self.encoder = Encoder(latent_dim=latent_dim)
-        self.encoder.compute_output_shape((None, 256, 256, 2))
-        self.decoder = Decoder(self.encoder.shape_before_flatten)
+        self.original_shape = original_shape
+        self.encoder.compute_output_shape((None,) + tuple(original_shape))
+        self.decoder = Decoder(self.encoder.shape_before_flatten, original_shape[-1])
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
@@ -158,6 +159,7 @@ class Vae(tf.keras.Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
         }
+
 
     def test_step(self, data):
         x, _ = data
