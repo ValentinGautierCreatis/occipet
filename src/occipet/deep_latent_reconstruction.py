@@ -20,6 +20,8 @@ class DeepLatentReconstruction:
         self.tau = 1
         self.tau_max = 100
         self.coeffs = np.array([1, 1])
+        self.correction_mean = 0
+        self.correction_std = 1
         self.rho_pet: float
         self.rho_mr: float
         self.y_pet: np.ndarray
@@ -43,7 +45,9 @@ class DeepLatentReconstruction:
     def z_step(self, z, x, mu):
         with tf.GradientTape() as tape:
             tape.watch(z)
-            decoded = self.autoencoder.decoder(z) * self.coeffs
+            decoded = (
+                self.autoencoder.decoder(z) * self.correction_std + self.correction_mean
+            )
             new_image = (x + mu) - decoded
             squared = tf.math.square(new_image)
         update_term = tape.gradient(squared, z)
@@ -85,18 +89,31 @@ class DeepLatentReconstruction:
     def compute_coeffs(self, x, decoded):
         return x.mean(axis=(0, 1)) / decoded.mean(axis=(0, 1))
 
+    def compute_correction(self, ref, decoded):
+        mean_ref = np.mean(ref, axis=(0, 1), keepdims=True)
+        std_ref = np.sqrt(((ref - mean_ref) ** 2).mean(axis=(0, 1), keepdims=True))
+
+        mean_dec = np.mean(decoded, axis=(0, 1), keepdims=True)
+        std_dec = np.sqrt(((decoded - mean_dec) ** 2).mean(axis=(0, 1), keepdims=True))
+
+        return mean_ref-mean_dec, std_ref/std_dec
+
     def decoding(self, z):
         return np.squeeze(self.autoencoder.decoder(z).numpy(), axis=0)
 
     def pet_reconstruction_step(self, x, mu, z):
         decoded = self.decoding(z)
         self.coeffs = self.compute_coeffs(x, decoded)
-        decoded = self.coeffs * decoded
+        self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
+        # decoded = self.coeffs * decoded
+        decoded = self.correction_std * decoded + self.correction_mean
+        # decoded[decoded[:,:,0] <= 0] = 10**-6
+        # print(f"ref {x[:,:,0].mean()}")
         # print(self.rho_pet)
-        # plt.imshow(x[:,:,1])
-        # plt.colorbar()
-        # plt.show()
-        pet_decoded = decoded[:, :, 0]
+        plt.imshow(decoded[:,:,1])
+        plt.colorbar()
+        plt.show()
+        pet_decoded = decoded[:, :, 1]
         x_pet = x[:, :, 0]
 
         # PET STEP
@@ -108,8 +125,10 @@ class DeepLatentReconstruction:
         # Z STEP
         new_z = self.z_step(z, new_x, mu)
         new_decoded = self.decoding(new_z)
-        new_coeff = self.compute_coeffs(x, new_decoded)
-        new_decoded = new_coeff * new_decoded
+        # new_coeff = self.compute_coeffs(x, new_decoded)
+        new_mean, new_std = self.compute_correction(new_x, new_decoded)
+        # new_decoded = new_coeff * new_decoded
+        new_decoded = new_mean + new_decoded * new_std
 
         # LAGRANGIAN STEP
         new_mu = self.lagrangian_step(new_x, mu, new_decoded)
@@ -126,7 +145,7 @@ class DeepLatentReconstruction:
         update_factor = self.compute_rho_update_factor(norm_primal, norm_dual)
         self.rho_pet = self.rho_pet * update_factor
         # Remember to rescale Mu too
-        new_mu[:, :, 0] = new_mu[:, :, 0] / update_factor
+        new_mu = new_mu / update_factor
 
         stop = False
         if norm_primal <= self.eps_rel and norm_dual <= self.eps_rel:
@@ -144,8 +163,8 @@ class DeepLatentReconstruction:
         self.y_pet = y_pet
         self.projector_id = projector_id
         self.eps_rel = eps_rel
-        x_pet0_normalized = x_pet0 / x_pet0.max()
-        ref_mr_normalized = ref_mr / ref_mr.max()
+        x_pet0_normalized = (x_pet0 - x_pet0.mean()) / x_pet0.std()
+        ref_mr_normalized = (ref_mr - ref_mr.mean()) / ref_mr.std()
         x0_normalized = np.concatenate(
             (
                 np.expand_dims(x_pet0_normalized, axis=-1),
@@ -170,7 +189,7 @@ class DeepLatentReconstruction:
         return x  # [:,:,0]
 
     def pet_reconstruction_metrics(
-            self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
+        self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
     ):
         # Initializations
         self.nb_steps = nb_steps
