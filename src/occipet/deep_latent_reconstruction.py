@@ -16,7 +16,6 @@ class DeepLatentReconstruction:
         self, autoencoder: variational_auto_encoder.VariationalAutoEncoder
     ) -> None:
         self.autoencoder = autoencoder
-        self.optimizer = tf.keras.optimizers.Adam()
         self.xi = 1
         self.u = 10
         self.tau = 1
@@ -51,19 +50,31 @@ class DeepLatentReconstruction:
         signal = (1 / (self.rho_mr + self.N)) * (
             self.N * ifft2(self.y_mr) + self.rho_mr * (mr_decoded - mu)
         )
-        return abs(signal)
+        return np.real(signal)
 
     def z_step(self, z, x, mu):
-        with tf.GradientTape() as tape:
-            tape.watch(z)
+        def f():
             decoded = (
                 self.autoencoder.decoder(z) * self.correction_std + self.correction_mean
             )
             new_image = (x + mu) - decoded
             squared = tf.math.square(new_image)
-        update_term = tape.gradient(squared, z)
+            return squared
 
-        return z - self.step_size * update_term
+        self.optimizer.minimize(f, [z])
+        return z
+
+        # with tf.GradientTape() as tape:
+        #     tape.watch(z)
+        #     decoded = (
+        #         self.autoencoder.decoder(z) * self.correction_std + self.correction_mean
+        #     )
+        #     new_image = (x + mu) - decoded
+        #     squared = tf.math.square(new_image)
+        # update_term = tape.gradient(squared, z)
+        # return self.optimizer.apply_gradients(zip(update_term, z))
+
+        # return z - self.step_size * update_term
 
     def lagrangian_step(self, x, mu, decoded):
         return mu + x - decoded
@@ -74,23 +85,6 @@ class DeepLatentReconstruction:
 
         normalisation_dual = np.linalg.norm(mu)
         norm_dual = np.linalg.norm((decoded - old_decoded) / normalisation_dual)
-
-        return norm_primal, norm_dual
-
-    def compute_splitted_residuals(self, x, mu, decoded, old_decoded):
-        normalisation_primal = np.max(
-            [
-                np.linalg.norm(x, axis=(0, 1), keepdims=True),
-                np.linalg.norm(decoded, axis=(0, 1), keepdims=True),
-            ],
-            axis=0,
-        )
-        norm_primal = np.linalg.norm((x - decoded) / normalisation_primal, axis=(0, 1))
-
-        normalisation_dual = np.linalg.norm(mu, axis=(0, 1), keepdims=True)
-        norm_dual = np.linalg.norm(
-            (decoded - old_decoded) / normalisation_dual, axis=(0, 1)
-        )
 
         return norm_primal, norm_dual
 
@@ -111,6 +105,15 @@ class DeepLatentReconstruction:
         elif norm_dual > (self.u / self.xi) * norm_primal:
             # rho = min(rho/tau, rho_max)
             update_factor = 1 / self.tau
+
+        return update_factor
+
+    def compute_splitted_rho_update_factor(self, norm_primal, norm_dual, tau):
+        update_factor = 1
+        if norm_primal > self.xi * self.u * norm_dual:
+            update_factor = tau
+        elif norm_dual > (self.u / self.xi) * norm_primal:
+            update_factor = 1 / tau
 
         return update_factor
 
@@ -183,6 +186,7 @@ class DeepLatentReconstruction:
         self, x_pet0, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
     ):
         # Initializations
+        self.optimizer = tf.keras.optimizers.Adam(0.05)
         self.nb_steps = nb_steps
         self.step_size = step_size
         self.y_pet = y_pet
@@ -198,6 +202,7 @@ class DeepLatentReconstruction:
             axis=-1,
         )
         *_, z = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
+        z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
             (np.expand_dims(x_pet0, axis=-1), np.expand_dims(ref_mr, axis=-1)), axis=-1
@@ -217,8 +222,11 @@ class DeepLatentReconstruction:
         decoded = self.decoding(z)
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
-        plt.imshow(decoded[:, :, 1])
+        _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        axes[0].imshow(decoded[:, :, 0])
+        axes[1].imshow(x[:, :, 0])
         plt.show()
+        # print(self.rho_pet)
 
         # PET STEP
         new_x_pet = self.pet_step(x[:, :, 0], decoded[:, :, 0], mu[:, :, 0])
@@ -250,17 +258,22 @@ class DeepLatentReconstruction:
 
         # TAU UPDATE
         self.tau_pet = self.tau_update(norm_primal_pet, norm_dual_pet)
-        self.tau_mr = self.tau_update(norm_primal_mr, norm_dual_pet)
+        self.tau_mr = self.tau_update(norm_primal_mr, norm_dual_mr)
 
         # RHO UPDATE
-        update_factor_pet = self.compute_rho_update_factor(
-            norm_primal_pet, norm_dual_pet
+        update_factor_pet = self.compute_splitted_rho_update_factor(
+            norm_primal_pet, norm_dual_pet, self.tau_pet
         )
-        update_factor_mr = self.compute_rho_update_factor(norm_primal_mr, norm_dual_mr)
+
+        update_factor_mr = self.compute_splitted_rho_update_factor(
+            norm_primal_mr, norm_dual_mr, self.tau_mr
+        )
         self.rho_pet = self.rho_pet * update_factor_pet
         self.rho_mr = self.rho_mr * update_factor_mr
 
-        new_mu = new_mu / np.array([update_factor_pet, update_factor_mr])
+        # new_mu = new_mu / np.array([update_factor_pet, update_factor_mr])
+        new_mu[:, :, 0] = new_mu[:, :, 0] / update_factor_pet
+        new_mu[:, :, 1] = new_mu[:, :, 1] / update_factor_mr
 
         stop = False
         if (
@@ -277,6 +290,7 @@ class DeepLatentReconstruction:
         self, x_pet0, x_mr0, y_pet, y_mr, projector_id, step_size, nb_steps, eps_rel
     ):
         # Initializations
+        self.optimizer = tf.keras.optimizers.Adam(0.05)
         self.nb_steps = nb_steps
         self.step_size = step_size
         self.y_pet = y_pet
@@ -294,6 +308,7 @@ class DeepLatentReconstruction:
             axis=-1,
         )
         *_, z = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
             (np.expand_dims(x_pet0, axis=-1), np.expand_dims(x_mr0, axis=-1)), axis=-1
