@@ -63,7 +63,7 @@ class Mcvae(tf.keras.Model):
         return total
 
     def compute_reconstruction_loss_single(self, reconstructed, ref):
-        loss = tf.reduce_mean(tf.square(ref - reconstructed), axis=(1, 2, 3))
+        loss = tf.reduce_mean(tf.abs(ref - reconstructed), axis=(1, 2, 3))
         return loss
 
     def compute_reconstruction_loss(self, p, x):
