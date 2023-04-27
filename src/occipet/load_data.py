@@ -128,6 +128,7 @@ def generate_pet_data_from_image(image: np.ndarray, background_event_ratio: floa
     angles = np.linspace(0, 2*np.pi, nb_angles)
     projector_id = create_projector(pet.shape, angles, None)
     _, proj = forward_projection(pet, projector_id)
+    proj = proj * (nb_photons/(np.sum(proj)))
     r = (1/(1/background_event_ratio - 1)) * np.ones(proj.shape) * np.sum(proj) / np.sum(np.ones(proj.shape))
 
     proj = proj + r

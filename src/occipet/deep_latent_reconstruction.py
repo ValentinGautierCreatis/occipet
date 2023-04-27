@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from functools import partial
 
 import matplotlib.pyplot as plt
-from scipy.fft import ifft2
+from scipy.fft import fft2, ifft2
 from occipet.reconstruction import em_step
 from skimage.metrics import structural_similarity as ssim
+from typing import Callable
 from .utils import *
 import tensorflow as tf
+import scipy.sparse.linalg as linalg
 from deep_learning import variational_auto_encoder
 
 
@@ -31,6 +34,7 @@ class DeepLatentReconstruction:
         self.y_mr: np.ndarray
         self.N: int
         self.projector_id: int
+        self.mri_subsampling: Callable
         self.nb_steps: int
         self.eps_rel: float
 
@@ -46,11 +50,31 @@ class DeepLatentReconstruction:
 
         return new_xpet
 
+    def apply_A(self, x):
+        transformed = self.N * ifft2(self.mri_subsampling(fft2(x)))
+        return self.rho_mr * x + np.real(transformed)
+
+    def apply_A_on_flattened(self, shape, x):
+        x = x.reshape(shape)
+        Ax = self.apply_A(x)
+        return Ax.ravel()
+
     def mr_step(self, mr_decoded, mu):
         signal = (1 / (self.rho_mr + self.N)) * (
             self.N * ifft2(self.y_mr) + self.rho_mr * (mr_decoded - mu)
         )
         return np.real(signal)
+
+    def mr_step_subsampled(self, x_mr, mr_decoded, mu):
+        partial_A = partial(self.apply_A_on_flattened, x_mr.shape)
+        A = linalg.LinearOperator((x_mr.size, x_mr.size), matvec=partial_A)
+        b = np.real(ifft2(self.y_mr)) + self.rho_mr * (mr_decoded - mu)
+
+        b_flat = b.ravel()
+        x_flat = x_mr.ravel()
+
+        x_flat, _ = linalg.cg(A, b_flat, x0=x_flat)
+        return x_flat.reshape(x_mr.shape)
 
     def z_step(self, z, x, mu):
         def f():
@@ -223,16 +247,17 @@ class DeepLatentReconstruction:
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
         _, axes = plt.subplots(1, 2, figsize=(10, 5))
-        axes[0].imshow(decoded[:, :, 0])
-        axes[1].imshow(x[:, :, 0])
+        ind = 0
+        axes[0].imshow(decoded[:, :, ind])
+        axes[1].imshow(x[:, :, ind])
         plt.show()
-        # print(self.rho_pet)
 
         # PET STEP
         new_x_pet = self.pet_step(x[:, :, 0], decoded[:, :, 0], mu[:, :, 0])
 
         # MR STEP
-        new_x_mr = self.mr_step(decoded[:, :, 1], mu[:, :, 1])
+        # new_x_mr = self.mr_step(decoded[:, :, 1], mu[:, :, 1])
+        new_x_mr = self.mr_step_subsampled(x[:, :, 1], decoded[:, :, 1], mu[:, :, 1])
 
         new_x = np.concatenate(
             (np.expand_dims(new_x_pet, axis=-1), np.expand_dims(new_x_mr, axis=-1)),
@@ -287,7 +312,16 @@ class DeepLatentReconstruction:
         return new_x, new_mu, new_z, stop
 
     def reconstruction(
-        self, x_pet0, x_mr0, y_pet, y_mr, projector_id, step_size, nb_steps, eps_rel
+        self,
+        x_pet0,
+        x_mr0,
+        y_pet,
+        y_mr,
+        projector_id,
+        mri_subsampling,
+        step_size,
+        nb_steps,
+        eps_rel,
     ):
         # Initializations
         self.optimizer = tf.keras.optimizers.Adam(0.05)
@@ -296,6 +330,7 @@ class DeepLatentReconstruction:
         self.y_pet = y_pet
         self.y_mr = y_mr
         self.projector_id = projector_id
+        self.mri_subsampling = mri_subsampling
         self.eps_rel = eps_rel
         self.N = int(np.prod(x_mr0.shape))
         x_pet0_standardized = (x_pet0 - x_pet0.mean()) / x_pet0.std()
@@ -371,3 +406,78 @@ class DeepLatentReconstruction:
             points_pet["constraint"].append(np.sum((x_pet - decoded[:, :, 0]) ** 2))
 
         return x[:, :, 0], points_pet
+
+    def reconstruction_metrics(
+        self,
+        x_pet0,
+        x_mr0,
+        x_ref,
+        y_pet,
+        y_mr,
+        projector_id,
+        mri_subsampling,
+        step_size,
+        nb_steps,
+        eps_rel,
+    ):
+        # Initializations
+        self.optimizer = tf.keras.optimizers.Adam(0.05)
+        self.nb_steps = nb_steps
+        self.step_size = step_size
+        self.y_pet = y_pet
+        self.y_mr = y_mr
+        self.projector_id = projector_id
+        self.mri_subsampling = mri_subsampling
+        self.eps_rel = eps_rel
+        self.N = int(np.prod(x_mr0.shape))
+        x_pet0_standardized = (x_pet0 - x_pet0.mean()) / x_pet0.std()
+        x_mr0_standardized = (x_mr0 - x_mr0.mean()) / x_mr0.std()
+        x0_standardized = np.concatenate(
+            (
+                np.expand_dims(x_pet0_standardized, axis=-1),
+                np.expand_dims(x_mr0_standardized, axis=-1),
+            ),
+            axis=-1,
+        )
+        *_, z = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z = tf.Variable(z, trainable=True)
+
+        x = np.concatenate(
+            (np.expand_dims(x_pet0, axis=-1), np.expand_dims(x_mr0, axis=-1)), axis=-1
+        )
+        mu = np.zeros_like(x)
+        self.rho_pet = 1 / np.sum(y_pet)
+        self.rho_mr = self.rho_pet
+
+        # Initializing metrics
+        list_keys = ["nrmse", "ssim", "fidelity", "constraint"]
+        points_pet = dict((k, list()) for k in list_keys)
+        points_mr = dict((k, list()) for k in list_keys)
+
+        for _ in range(nb_steps):
+            x, mu, z, stop = self.reconstruction_step(x, mu, z)
+            if stop:
+                break
+
+            # Plots
+            x_n = normalize_meanstd(x, (0,1))
+            x_pet = x_n[:, :, 0]
+            x_mr = x_n[:,:,1]
+            ref_pet = x_ref[:,:,0]
+            ref_mr = x_ref[:,:,1]
+
+            decoded = self.decoding(z)
+            decoded = decoded
+
+            points_pet["nrmse"].append(nrmse(ref_pet, x_pet))
+            points_pet["ssim"].append(ssim(x_pet, ref_pet, data_range=x_pet.max()-x_pet.min()))
+            points_pet["fidelity"].append(data_fidelity_pet(x_pet, y_pet, projector_id))
+            points_pet["constraint"].append(np.sum((x_pet - decoded[:, :, 0]) ** 2))
+
+            points_mr["nrmse"].append(nrmse(ref_mr, x_mr))
+            points_mr["ssim"].append(ssim(x_mr, ref_mr, data_range=x_mr.max()-x_mr.min()))
+            points_mr["fidelity"].append(data_fidelity_mri(x_mr, y_mr, projector_id))
+            points_mr["constraint"].append(np.sum((x_mr - decoded[:, :, 1]) ** 2))
+
+
+        return x, points_pet, points_mr
