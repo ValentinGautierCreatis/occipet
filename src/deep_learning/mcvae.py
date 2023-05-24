@@ -50,7 +50,7 @@ class Mcvae(tf.keras.Model):
 
     def compute_kl_single(self, z_mean, z_log_var):
         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-        kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+        kl_loss = tf.reduce_sum(kl_loss, axis=1)
 
         return kl_loss
 
@@ -60,7 +60,7 @@ class Mcvae(tf.keras.Model):
         for z_mean, z_log_var in z_params:
             total += self.compute_kl_single(z_mean, z_log_var)
 
-        return total
+        return tf.reduce_mean(total)
 
     def compute_reconstruction_loss_single(self, reconstructed, ref):
         loss = tf.reduce_mean(tf.square(ref - reconstructed), axis=(1, 2, 3))
@@ -71,7 +71,7 @@ class Mcvae(tf.keras.Model):
         for i in range(self.nb_channels):
             for j in range(self.nb_channels):
                 total += self.compute_reconstruction_loss_single(p[i][j], x[..., i:i+1])
-        return total
+        return tf.reduce_mean(total)
 
     def train_step(self, data):
         x, _ = data
