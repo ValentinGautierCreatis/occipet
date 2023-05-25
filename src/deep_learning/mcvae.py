@@ -71,12 +71,13 @@ class Mcvae(tf.keras.Model):
         for i in range(self.nb_channels):
             for j in range(self.nb_channels):
                 total += self.compute_reconstruction_loss_single(p[i][j], x[..., i:i+1])
+        print(tf.shape(total))
         return tf.reduce_mean(total)
 
     def train_step(self, data):
         x, _ = data
 
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(persistent=True) as tape:
             z_params, z = self.encode(x)
             p = self.decode(z)
 
