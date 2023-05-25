@@ -7,13 +7,16 @@ import tensorflow as tf
 
 
 class Mcvae(tf.keras.Model):
-    def __init__(self, latent_dim, beta, original_shape=(256,256,2), **kwargs):
+    def __init__(self, latent_dim, beta, original_shape=(256, 256, 2), **kwargs):
         super().__init__(**kwargs)
         self.latent_dim = latent_dim
         self.beta = beta
         self.original_dim = original_shape
         self.nb_channels = original_shape[-1]
-        self.vae = [Vae(tuple(original_shape[:-1]) + (1,), latent_dim, beta) for _ in range(self.nb_channels)]
+        self.vae = [
+            Vae(tuple(original_shape[:-1]) + (1,), latent_dim, beta)
+            for _ in range(self.nb_channels)
+        ]
         for vae in self.vae:
             vae.build((None,) + tuple(original_shape[:-1]) + (1,))
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
@@ -26,12 +29,11 @@ class Mcvae(tf.keras.Model):
         z_params = []
         z = []
         for i in range(self.nb_channels):
-            z_mean, z_var, z_sampled = self.vae[i].encoder(x[..., i:i+1])
+            z_mean, z_var, z_sampled = self.vae[i].encoder(x[..., i : i + 1])
             z_params.append((z_mean, z_var))
             z.append(z_sampled)
 
         return z_params, z
-
 
     def decode(self, z):
         p = []
@@ -55,7 +57,6 @@ class Mcvae(tf.keras.Model):
         return kl_loss
 
     def compute_kl(self, z_params):
-
         total = 0
         for z_mean, z_log_var in z_params:
             total += self.compute_kl_single(z_mean, z_log_var)
@@ -70,7 +71,9 @@ class Mcvae(tf.keras.Model):
         total = 0
         for i in range(self.nb_channels):
             for j in range(self.nb_channels):
-                total += self.compute_reconstruction_loss_single(p[i][j], x[..., i:i+1])
+                total += self.compute_reconstruction_loss_single(
+                    p[i][j], x[..., i : i + 1]
+                )
         print(tf.shape(total))
         return tf.reduce_mean(total)
 
@@ -86,11 +89,17 @@ class Mcvae(tf.keras.Model):
 
             total_loss = kl_loss + reconstruction_loss
 
+        # TODO écrit comme ça je ne peut avoir que 2 modalités
         grads_vae0 = tape.gradient(total_loss, self.vae[0].trainable_weights)
         grads_vae1 = tape.gradient(total_loss, self.vae[1].trainable_weights)
+
         self.optimizer.apply_gradients(
-                zip(grads_vae1, self.vae[1].trainable_weights),
+            zip(
+                grads_vae0 + grads_vae1,
+                self.vae[0].trainable_weights + self.vae[1].trainable_weights,
+            )
         )
+
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
@@ -99,4 +108,3 @@ class Mcvae(tf.keras.Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
         }
-
