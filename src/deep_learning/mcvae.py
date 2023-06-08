@@ -138,7 +138,7 @@ class test_Mcvae(tf.keras.Model):
         z_params = []
         z = []
         for i in range(self.nb_channels):
-            z_mean, z_var, z_sampled = self.vae[i].encoder(x[:,:,:, i : i + 1])
+            z_mean, z_var, z_sampled = self.vaes[i].encoder(x[:,:,:, i : i + 1])
             z_params.append((z_mean, z_var))
             z.append(z_sampled)
 
