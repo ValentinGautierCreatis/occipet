@@ -132,9 +132,15 @@ class test_Mcvae(tf.keras.Model):
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
 
     def encode(self, x):
-        temp = [self.vaes[i].encoder(x[:,:,:, i : i + 1])for i in range(self.nb_channels)]
-        z_params = [(encoded[0], encoded[1]) for encoded in temp]
-        z = [encoded[2] for encoded in temp]
+        # temp = [self.vaes[i].encoder(x[:,:,:, i : i + 1])for i in range(self.nb_channels)]
+        # z_params = [(encoded[0], encoded[1]) for encoded in temp]
+        # z = [encoded[2] for encoded in temp]
+        z_params = []
+        z = []
+        for i in range(self.nb_channels):
+            z_mean, z_var, z_sampled = self.vae[i].encoder(x[:,:,:, i : i + 1])
+            z_params.append((z_mean, z_var))
+            z.append(z_sampled)
 
         return z_params, z
 
