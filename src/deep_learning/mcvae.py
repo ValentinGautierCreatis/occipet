@@ -162,7 +162,7 @@ class test_Mcvae(tf.keras.Model):
         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
         kl_loss = tf.reduce_sum(kl_loss, axis=1)
 
-        return tf.reduce_mean(kl_loss)
+        return kl_loss
 
     def compute_kl(self, z_params):
         total = 0
@@ -173,7 +173,7 @@ class test_Mcvae(tf.keras.Model):
 
     def compute_reconstruction_loss_single(self, reconstructed, ref):
         loss = tf.reduce_mean(tf.square(ref - reconstructed), axis=(1, 2, 3))
-        return tf.reduce_mean(loss)
+        return loss
 
     def compute_reconstruction_loss(self, p, x):
         total = 0
