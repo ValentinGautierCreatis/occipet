@@ -14,7 +14,7 @@ def train_model(model: tf.keras.Model, checkpoint_path: str,
                 tensorboard=False) -> None:
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=pathlib.Path(checkpoint_path) / "checkpoint",
-        # save_weights_only=True,
+        save_weights_only=True,
         # verbose=1
     )
 
