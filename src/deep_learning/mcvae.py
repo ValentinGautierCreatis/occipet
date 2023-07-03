@@ -183,8 +183,9 @@ class test_Mcvae(tf.keras.Model):
                 single_loss = self.compute_reconstruction_loss_single(
                     p[i][j], x[:,:,:, i : i + 1]
                 )
-                total += single_loss
+                # total += single_loss
                 losses.append(single_loss)
+        total = total + losses[0] + losses[3]
         self.partial0.update_state(losses[0])
         self.partial1.update_state(losses[1])
         self.partial2.update_state(losses[2])
