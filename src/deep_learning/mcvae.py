@@ -204,15 +204,17 @@ class test_Mcvae(tf.keras.Model):
             total_loss = kl_loss + reconstruction_loss
 
         # TODO écrit comme ça je ne peut avoir que 2 modalités
-        grads_vae0 = tape.gradient(total_loss, self.vaes[0].trainable_weights)
-        grads_vae1 = tape.gradient(total_loss, self.vaes[1].trainable_weights)
+        # grads_vae0 = tape.gradient(total_loss, self.vaes[0].trainable_weights)
+        # grads_vae1 = tape.gradient(total_loss, self.vaes[1].trainable_weights)
 
-        self.optimizer.apply_gradients(
-            zip(
-                grads_vae0 + grads_vae1,
-                self.vaes[0].trainable_weights + self.vaes[1].trainable_weights,
-            )
-        )
+        # self.optimizer.apply_gradients(
+        #     zip(
+        #         grads_vae0 + grads_vae1,
+        #         self.vaes[0].trainable_weights + self.vaes[1].trainable_weights,
+        #     )
+        # )
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
