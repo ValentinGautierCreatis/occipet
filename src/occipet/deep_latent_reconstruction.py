@@ -12,6 +12,7 @@ from .utils import *
 import tensorflow as tf
 import scipy.sparse.linalg as linalg
 from deep_learning import variational_auto_encoder
+from deep_learning import mcvae
 
 
 class DeepLatentReconstruction:
@@ -51,7 +52,7 @@ class DeepLatentReconstruction:
         return new_xpet
 
     def apply_A(self, x):
-        transformed = self.N * ifft2(self.mri_subsampling(fft2(x)))
+        transformed = ifft2(self.mri_subsampling(fft2(x)))
         return self.rho_mr * x + np.real(transformed)
 
     def apply_A_on_flattened(self, shape, x):
@@ -225,7 +226,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        *_, z = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
+        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -246,18 +247,22 @@ class DeepLatentReconstruction:
         decoded = self.decoding(z)
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
-        _, axes = plt.subplots(1, 2, figsize=(10, 5))
-        ind = 0
-        axes[0].imshow(decoded[:, :, ind])
-        axes[1].imshow(x[:, :, ind])
-        plt.show()
+        # _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        # ind = 0
+        # im1 = axes[0].imshow(decoded[:, :, ind])
+        # im2 = axes[1].imshow(x[:, :, ind])
+        # plt.colorbar(im2,ax=axes[1])
+        # plt.show()
 
         # PET STEP
-        new_x_pet = self.pet_step(x[:, :, 0], decoded[:, :, 0], mu[:, :, 0])
+        new_x_pet = np.array(x[:,:,0])
+        for _ in range(6):
+            new_x_pet = self.pet_step(new_x_pet, decoded[:, :, 0], mu[:, :, 0])
 
         # MR STEP
         # new_x_mr = self.mr_step(decoded[:, :, 1], mu[:, :, 1])
         new_x_mr = self.mr_step_subsampled(x[:, :, 1], decoded[:, :, 1], mu[:, :, 1])
+        # new_x_mr = x[:,:,1]
 
         new_x = np.concatenate(
             (np.expand_dims(new_x_pet, axis=-1), np.expand_dims(new_x_mr, axis=-1)),
@@ -342,7 +347,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        *_, z = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -378,7 +383,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        *_, z = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
+        z, _, _ = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
 
         x = np.concatenate(
             (np.expand_dims(x_pet0, axis=-1), np.expand_dims(ref_mr, axis=-1)), axis=-1
@@ -439,7 +444,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        *_, z = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -462,9 +467,21 @@ class DeepLatentReconstruction:
             # Plots
             x_n = normalize_meanstd(x, (0,1))
             x_pet = x_n[:, :, 0]
+            # x_pet = x_pet - x_pet.min()
             x_mr = x_n[:,:,1]
+            # x_mr = x_mr - x_mr.min()
             ref_pet = x_ref[:,:,0]
+            # ref_pet = ref_pet - ref_pet.min()
             ref_mr = x_ref[:,:,1]
+            # ref_mr = ref_mr - ref_mr.min()
+
+            correction_term_pet = min(x_pet.min(), ref_pet.min())
+            correction_term_mr = min(x_mr.min(), ref_mr.min())
+
+            x_pet = x_pet - correction_term_pet
+            x_mr = x_mr - correction_term_mr
+            ref_pet = ref_pet - correction_term_pet
+            ref_mr = ref_mr - correction_term_mr
 
             decoded = self.decoding(z)
             decoded = decoded
@@ -481,3 +498,10 @@ class DeepLatentReconstruction:
 
 
         return x, points_pet, points_mr
+
+
+class DLR_MCVAE(DeepLatentReconstruction):
+    def __init__(self, model: mcvae.Mcvae) -> None:
+        super().__init__(model)
+
+    # def z_step(self, z, x, mu):

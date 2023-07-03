@@ -127,7 +127,7 @@ class Vae(tf.keras.Model):
     def call(self, inputs):
         # self._set_inputs(inputs)
         z_mean, z_log_var, z = self.encoder(inputs)
-        reconstructed = self.decoder(z)
+        reconstructed = self.decoder(z_mean)
         # Add KL divergence regularization loss.
         # kl_loss = - 0.5 * tf.reduce_sum(
         #     z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1)
