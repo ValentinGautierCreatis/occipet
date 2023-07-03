@@ -224,7 +224,7 @@ class test_Mcvae(tf.keras.Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
             "partial0": self.partial0.result(),
-            "partial1": self.partial0.result(),
-            "partial2": self.partial0.result(),
-            "partial3": self.partial0.result(),
+            "partial1": self.partial1.result(),
+            "partial2": self.partial2.result(),
+            "partial3": self.partial3.result(),
         }
