@@ -336,3 +336,24 @@ def normalize_meanstd(a, axis=None) -> np.ndarray:
     mean = np.mean(a, axis=axis, keepdims=True)
     std = np.sqrt(((a - mean) ** 2).mean(axis=axis, keepdims=True))
     return (a - mean) / std
+
+
+def normalize(a, axis=None) -> np.ndarray:
+    """Returns the normalized version of the input array along desired axes
+
+    Parameters
+    ----------
+    a : np.ndarray
+        The array to be standardized
+    axis : int, tuple
+        Axes along which to perform reduction
+
+    Returns
+    -------
+    np.ndarray
+        Normalized array
+
+    """
+    mini = np.min(a, axis=axis, keepdims=True)
+    maxi = np.max(a, axis=axis, keepdims=True)
+    return (a - mini) / (maxi - mini)

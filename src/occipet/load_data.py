@@ -117,7 +117,7 @@ def generate_pet_data(data_file: str, background_event_ratio: float,
 
 
 def generate_pet_data_from_image(image: np.ndarray, background_event_ratio: float,
-                      nb_angles: int = 100, nb_photons = 10**7):
+                      nb_angles: int = 100, nb_photons = 10**7) -> tuple[np.ndarray, int]:
 
     """generates noisy pet data from an image
 
