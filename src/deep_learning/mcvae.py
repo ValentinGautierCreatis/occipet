@@ -108,13 +108,22 @@ class Mcvae(tf.keras.Model):
             "kl_loss": self.kl_loss_tracker.result(),
         }
 
+
 class test_Mcvae(tf.keras.Model):
-    def __init__(self, latent_dim, beta, original_shape=(256, 256, 2), **kwargs):
+    def __init__(
+        self,
+        latent_dim,
+        beta,
+        original_shape=(256, 256, 2),
+        reconstruction_factor=(1, 1, 1, 1),
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.latent_dim = latent_dim
         self.beta = beta
         self.original_dim = original_shape
         self.nb_channels = original_shape[-1]
+        self.reconstruction_factor = reconstruction_factor
         self.vaes = [
             Vae(tuple(original_shape[:-1]) + (1,), latent_dim, beta)
             for _ in range(self.nb_channels)
@@ -138,7 +147,7 @@ class test_Mcvae(tf.keras.Model):
         z_params = []
         z = []
         for i in range(self.nb_channels):
-            z_mean, z_var, z_sampled = self.vaes[i].encoder(x[:,:,:, i : i + 1])
+            z_mean, z_var, z_sampled = self.vaes[i].encoder(x[:, :, :, i : i + 1])
             z_params.append((z_mean, z_var))
             z.append(z_sampled)
 
@@ -154,7 +163,9 @@ class test_Mcvae(tf.keras.Model):
 
     def call(self, x):
         z_params, _ = self.encode(x)
-        p = self.decode(z_params[0]) #decoding the mean z during inference for determinism
+        p = self.decode(
+            z_params[0]
+        )  # decoding the mean z during inference for determinism
 
         return p  # p[x][z]: p(x|z)
 
@@ -181,11 +192,17 @@ class test_Mcvae(tf.keras.Model):
         for i in range(self.nb_channels):
             for j in range(self.nb_channels):
                 single_loss = self.compute_reconstruction_loss_single(
-                    p[i][j], x[:,:,:, i : i + 1]
+                    p[i][j], x[:, :, :, i : i + 1]
                 )
                 # total += single_loss
                 losses.append(single_loss)
-        total = total + losses[0] + losses[3]
+        total = (
+            total
+            + self.reconstruction_factor[0] * losses[0]
+            + self.reconstruction_factor[1] * losses[1]
+            + self.reconstruction_factor[2] * losses[2]
+            + self.reconstruction_factor[3] * losses[3]
+        )
         self.partial0.update_state(losses[0])
         self.partial1.update_state(losses[1])
         self.partial2.update_state(losses[2])
