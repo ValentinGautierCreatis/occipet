@@ -53,10 +53,10 @@ def dlr(
         pet_decoded = decoded[:, :, 0]
 
         # print(rho)
-        plt.imshow(x[:, :, 0])
-        plt.imshow(decoded[:, :, 0] / coeffs[0])
-        plt.colorbar()
-        plt.show()
+        # plt.imshow(x[:, :, 0])
+        # plt.imshow(decoded[:, :, 0] / coeffs[0])
+        # plt.colorbar()
+        # plt.show()
 
         # PET STEP =========================================
         x_pet = x[:, :, 0]
@@ -260,8 +260,8 @@ def evaluation(nb_photons, S):
             nb_iterations,
         )
         x = x[:, :, 0] / x[:, :, 0].max()
-        plt.imshow(x)
-        plt.show()
+        # plt.imshow(x)
+        # plt.show()
         ref_mlem = reconstruction.MLEM(
             y_pet, x_init_pet.shape[:2], mlem_iterations, projector_id
         )
