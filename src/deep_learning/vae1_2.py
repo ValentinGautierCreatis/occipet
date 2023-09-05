@@ -70,7 +70,6 @@ class Vae1_2(tf.keras.Model):
         original_shape=(256, 256, 2),
         latent_dim=32,
         beta=1,
-        sparse=False,
         name="vae",
         **kwargs
     ):
