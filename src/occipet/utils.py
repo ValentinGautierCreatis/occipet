@@ -287,21 +287,28 @@ def data_fidelity_mri(image: np.ndarray, data: np.ndarray, W: float) -> float:
     return np.sum(intermediate)
 
 
-def nrmse(im1, im2):
-    """Computes the NRMSE between im1 and im2
+def nrmse(actual, predicted):
+    """Computes the NRMSE between actual and predicted
 
     Parameters
     ----------
-    im1 : np.ndarray
+    actual : np.ndarray
         The reference image
-    im2 : np.ndarray
+    predicted : np.ndarray
         The obtained image
 
     """
-    assert im1.shape == im2.shape, "Both images must have the same dimensions"
+    assert actual.shape == predicted.shape, "Both images must have the same dimensions"
 
-    # return np.sum(np.square(im1 - im2))/im1.size
-    return np.sqrt(np.sum(np.square(im1 - im2)) / im1.size) / np.mean(im1)
+    rmse = np.sqrt(np.mean((predicted - actual)**2))
+
+    # Calculate the range of the data
+    data_range = np.max(actual) - np.min(actual)
+
+    # Calculate NRMSE
+    nrmse = rmse / data_range
+
+    return nrmse
 
 
 def add_gaussian_noise(image, psnr=20):

@@ -80,7 +80,7 @@ class DeepLatentReconstruction:
     def z_step(self, z, x, mu):
         def f():
             decoded = (
-                self.autoencoder.decoder(z) * self.correction_std + self.correction_mean
+                self.autoencoder.decode(z) * self.correction_std + self.correction_mean
             )
             new_image = (x + mu) - decoded
             squared = tf.math.square(new_image)
@@ -149,13 +149,17 @@ class DeepLatentReconstruction:
         mean_ref = np.mean(ref, axis=(0, 1), keepdims=True)
         std_ref = np.sqrt(((ref - mean_ref) ** 2).mean(axis=(0, 1), keepdims=True))
 
-        mean_dec = np.mean(decoded, axis=(0, 1), keepdims=True)
-        std_dec = np.sqrt(((decoded - mean_dec) ** 2).mean(axis=(0, 1), keepdims=True))
+        # mean_dec = np.mean(decoded, axis=(0, 1), keepdims=True)
+        # std_dec = np.sqrt(((decoded - mean_dec) ** 2).mean(axis=(0, 1), keepdims=True))
 
-        return mean_ref - mean_dec, std_ref / std_dec
+        # return mean_ref - mean_dec, std_ref / std_dec
+        return mean_ref, std_ref
 
     def decoding(self, z):
-        return np.squeeze(self.autoencoder.decoder(z).numpy(), axis=0)
+        temp = np.squeeze(self.autoencoder.decode(z).numpy(), axis=0)
+        mean_temp = np.mean(temp, axis=(0, 1), keepdims=True)
+        std_temp = np.sqrt(((temp - mean_temp) ** 2).mean(axis=(0, 1), keepdims=True))
+        return (temp - mean_temp)/std_temp
 
     def pet_reconstruction_step(self, x, mu, z):
         decoded = self.decoding(z)
@@ -226,7 +230,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
+        z, *_ = self.autoencoder.encode(np.expand_dims(x0_normalized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -255,8 +259,8 @@ class DeepLatentReconstruction:
         # plt.show()
 
         # PET STEP
-        new_x_pet = np.array(x[:,:,0])
-        for _ in range(6):
+        new_x_pet = np.array(x[:,:,0], copy=True)
+        for _ in range(1):
             new_x_pet = self.pet_step(new_x_pet, decoded[:, :, 0], mu[:, :, 0])
 
         # MR STEP
@@ -347,7 +351,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z, *_ = self.autoencoder.encode(np.expand_dims(x0_standardized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -383,7 +387,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        z, _, _ = self.autoencoder.encoder(np.expand_dims(x0_normalized, axis=0))
+        z, _, _ = self.autoencoder.encode(np.expand_dims(x0_normalized, axis=0))
 
         x = np.concatenate(
             (np.expand_dims(x_pet0, axis=-1), np.expand_dims(ref_mr, axis=-1)), axis=-1
@@ -416,7 +420,6 @@ class DeepLatentReconstruction:
         self,
         x_pet0,
         x_mr0,
-        x_ref,
         y_pet,
         y_mr,
         projector_id,
@@ -444,7 +447,7 @@ class DeepLatentReconstruction:
             ),
             axis=-1,
         )
-        z, *_ = self.autoencoder.encoder(np.expand_dims(x0_standardized, axis=0))
+        z, *_ = self.autoencoder.encode(np.expand_dims(x0_standardized, axis=0))
         z = tf.Variable(z, trainable=True)
 
         x = np.concatenate(
@@ -455,7 +458,7 @@ class DeepLatentReconstruction:
         self.rho_mr = self.rho_pet
 
         # Initializing metrics
-        list_keys = ["nrmse", "ssim", "fidelity", "constraint"]
+        list_keys = ["fidelity", "constraint"]
         points_pet = dict((k, list()) for k in list_keys)
         points_mr = dict((k, list()) for k in list_keys)
 
@@ -465,43 +468,17 @@ class DeepLatentReconstruction:
                 break
 
             # Plots
-            x_n = normalize_meanstd(x, (0,1))
-            x_pet = x_n[:, :, 0]
-            # x_pet = x_pet - x_pet.min()
-            x_mr = x_n[:,:,1]
-            # x_mr = x_mr - x_mr.min()
-            ref_pet = x_ref[:,:,0]
-            # ref_pet = ref_pet - ref_pet.min()
-            ref_mr = x_ref[:,:,1]
-            # ref_mr = ref_mr - ref_mr.min()
-
-            correction_term_pet = min(x_pet.min(), ref_pet.min())
-            correction_term_mr = min(x_mr.min(), ref_mr.min())
-
-            x_pet = x_pet - correction_term_pet
-            x_mr = x_mr - correction_term_mr
-            ref_pet = ref_pet - correction_term_pet
-            ref_mr = ref_mr - correction_term_mr
+            x_pet = x[:, :, 0]
+            x_mr = x[:,:,1]
 
             decoded = self.decoding(z)
-            decoded = decoded
+            decoded = self.correction_std * decoded + self.correction_mean
 
-            points_pet["nrmse"].append(nrmse(ref_pet, x_pet))
-            points_pet["ssim"].append(ssim(x_pet, ref_pet, data_range=x_pet.max()-x_pet.min()))
             points_pet["fidelity"].append(data_fidelity_pet(x_pet, y_pet, projector_id))
             points_pet["constraint"].append(np.sum((x_pet - decoded[:, :, 0]) ** 2))
 
-            points_mr["nrmse"].append(nrmse(ref_mr, x_mr))
-            points_mr["ssim"].append(ssim(x_mr, ref_mr, data_range=x_mr.max()-x_mr.min()))
             points_mr["fidelity"].append(data_fidelity_mri(x_mr, y_mr, projector_id))
             points_mr["constraint"].append(np.sum((x_mr - decoded[:, :, 1]) ** 2))
 
 
         return x, points_pet, points_mr
-
-
-class DLR_MCVAE(DeepLatentReconstruction):
-    def __init__(self, model: mcvae.Mcvae) -> None:
-        super().__init__(model)
-
-    # def z_step(self, z, x, mu):
