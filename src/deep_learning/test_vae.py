@@ -124,6 +124,14 @@ class Vae(tf.keras.Model):
         )
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
 
+    @tf.function
+    def encode(self, x):
+        return self.encoder(x)
+
+    @tf.function
+    def decode(self, z):
+        return self.decoder(z)
+
     def call(self, inputs):
         # self._set_inputs(inputs)
         z_mean, z_log_var, z = self.encoder(inputs)
