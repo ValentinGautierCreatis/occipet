@@ -489,9 +489,17 @@ class DeepLatentReconstruction:
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
 
+        _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        ind = 0
+        im1 = axes[0].imshow(decoded[:, :, ind])
+        im2 = axes[1].imshow(x[:, :, ind])
+        plt.colorbar(im2,ax=axes[1])
+        plt.show()
+
         new_x = np.array(x[:,:,0], copy=True)
         for _ in range(1):
             new_x = self.pet_step(new_x, decoded[:, :, 0], mu[:, :, 0])
+        new_x = np.expand_dims(new_x, axis=-1)
 
 
         new_z = self.z_step(z, new_x, mu)
@@ -547,16 +555,108 @@ class DeepLatentReconstruction:
         self.projector_id = projector_id
         self.eps_rel = eps_rel
         x0_standardized = (x_pet0 - x_pet0.mean()) / x_pet0.std()
+        x0_standardized = np.expand_dims(x0_standardized, axis=-1)
         z, *_ = self.autoencoder.encode(np.expand_dims(x0_standardized, axis=0))
         z = tf.Variable(z, trainable=True)
 
-        x = x0_standardized
+        x = np.expand_dims(x_pet0, axis=-1)
         mu = np.zeros_like(x)
+        print(mu.shape)
         self.rho_pet = 1 / np.sum(y_pet)
 
         # Beginning of the algorithm
         for _ in range(self.nb_steps):
+
             x, mu, z, stop = self.mono_pet_step(x, mu, z)
+            if stop:
+                break
+
+        return x
+
+    def mono_mr_step(self, x, mu, z):
+        decoded = self.decoding(z)
+        self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
+        decoded = self.correction_std * decoded + self.correction_mean
+
+        _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        ind = 0
+        im1 = axes[0].imshow(decoded[:, :, ind])
+        im2 = axes[1].imshow(x[:, :, ind])
+        plt.colorbar(im2,ax=axes[1])
+        plt.show()
+
+        new_x = np.array(x[:,:,0], copy=True)
+        print(new_x.shape)
+        print(decoded[:,:,0].shape)
+        print(mu[...,0].shape)
+        new_x = self.mr_step_subsampled(new_x, decoded[:,:,0], mu[...,0])
+        new_x = np.expand_dims(new_x, axis=-1)
+
+        print("z_step")
+        new_z = self.z_step(z, new_x, mu)
+        new_decoded = self.decoding(new_z)
+        new_mean, new_std = self.compute_correction(new_x, new_decoded)
+        new_decoded = new_mean + new_decoded * new_std
+
+        # LAGRANGIAN STEP
+        new_mu = self.lagrangian_step(new_x, mu, new_decoded)
+
+        # RESIDUALS
+        norm_primal_mr, norm_dual_mr = self.compute_residuals(
+            new_x[:, :, 0], new_mu[:, :, 0], new_decoded[:, :, 0], decoded[:, :, 0]
+        )
+
+        # TAU UPDATE
+        self.tau_mr = self.tau_update(norm_primal_mr, norm_dual_mr)
+
+        # RHO UPDATE
+        update_factor_mr = self.compute_splitted_rho_update_factor(
+            norm_primal_mr, norm_dual_mr, self.tau_mr
+        )
+
+        self.rho_mr = self.rho_mr * update_factor_mr
+
+        # new_mu = new_mu / np.array([update_factor_mr, update_factor_mr])
+        new_mu[:, :, 0] = new_mu[:, :, 0] / update_factor_mr
+
+        stop = False
+        if (
+            norm_primal_mr <= self.eps_rel
+            and norm_dual_mr <= self.eps_rel
+        ):
+            stop = True
+
+        return new_x, new_mu, new_z, stop
+
+    def reconstruction_mono_mr(
+        self,
+        x_mr0,
+        y_mr,
+        mri_subsampling,
+        step_size,
+        nb_steps,
+        eps_rel,
+    ):
+
+        self.optimizer = tf.keras.optimizers.Adam(0.05)
+        self.nb_steps = nb_steps
+        self.step_size = step_size
+        self.y_mr = y_mr
+        self.mri_subsampling = mri_subsampling
+        self.eps_rel = eps_rel
+        x0_standardized = (x_mr0 - x_mr0.mean()) / x_mr0.std()
+        x0_standardized = np.expand_dims(x0_standardized, axis=-1)
+        z, *_ = self.autoencoder.encode(np.expand_dims(x0_standardized, axis=0))
+        z = tf.Variable(z, trainable=True)
+
+        x = np.expand_dims(x_mr0, axis=-1)
+        mu = np.zeros_like(x)
+        self.rho_mr = 1 / np.sum(y_mr)
+
+        # Beginning of the algorithm
+        for _ in range(self.nb_steps):
+
+            x, mu, z, stop = self.mono_mr_step(x, mu, z)
             if stop:
                 break
 
