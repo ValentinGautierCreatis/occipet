@@ -137,12 +137,8 @@ class mmJSD(tf.keras.Model):
         self.nb_modalities = original_shape[-1]
         self.vaes = [Vae(tuple(original_shape[:-1])+(1,), latent_dim, beta, name) for _ in range(self.nb_modalities)]
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
-        self.elbo1_tracker = keras.metrics.Mean(name="elbo1")
-        self.elbo2_tracker = keras.metrics.Mean(name="elbo2")
         self.elbo_poe_tracker = keras.metrics.Mean(name="elbo_poe")
-        self.kl1_tracker = keras.metrics.Mean(name="kl1")
-        self.kl2_tracker = keras.metrics.Mean(name="kl2")
-        self.kl_poe_tracker = keras.metrics.Mean(name="kl_poe")
+        self.jensen_tracker = keras.metrics.Mean(name="jensen")
         self.reconstruction1_tracker = keras.metrics.Mean(name="reconstruction1")
         self.reconstruction2_tracker = keras.metrics.Mean(name="reconstruction2")
         self.reconstruction_poe_tracker = keras.metrics.Mean(name="reconstruction_poe")
@@ -224,17 +220,14 @@ class mmJSD(tf.keras.Model):
         self.elbo_poe_tracker.update_state(loss_poe)
         self.reconstruction1_tracker.update_state(reconstruction1)
         self.reconstruction2_tracker.update_state(reconstruction2)
+        self.jensen_tracker.update_state(jensen)
         self.reconstruction_poe_tracker.update_state(reconstruction_poe)
 
         return {
-            "elbo1": self.elbo1_tracker.result(),
-            "elbo2": self.elbo2_tracker.result(),
             "elbo_poe": self.elbo_poe_tracker.result(),
-            "kl1": self.kl1_tracker.result(),
-            "kl2": self.kl2_tracker.result(),
-            "kl_poe": self.kl_poe_tracker.result(),
             "reconstruction1": self.reconstruction1_tracker.result(),
             "reconstruction2": self.reconstruction2_tracker.result(),
             "reconstruction_poe": self.reconstruction_poe_tracker.result(),
+            "jensen": self.jensen_tracker.result(),
             "total_loss": self.total_loss_tracker.result()
         }

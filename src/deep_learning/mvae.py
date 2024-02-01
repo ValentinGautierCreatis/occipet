@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
@@ -212,7 +211,7 @@ class MVAE(tf.keras.Model):
             loss1 = reconstruction1 + self.beta * kl1
             loss2 = reconstruction2 + self.beta * kl2
 
-            total_loss = loss_poe + loss1 + loss2
+            total_loss = loss_poe# + loss1 + loss2
 
         grads = tape.gradient(total_loss, self.trainable_weights)
 

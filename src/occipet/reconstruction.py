@@ -227,7 +227,9 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
             g[1]=(g[1]+tau*grad[1])/denom
 
         image=image-wn*div_2d(g)
-    return image[1:-1, :]
+
+    image[0,:] = image[-1,:] = 0
+    return image
 
 
 def merhanian_joint_pet_mr(rho_u: float, rho_v: float, lambda_u: float, lambda_v: float,

@@ -12,7 +12,6 @@ from .utils import *
 import tensorflow as tf
 import scipy.sparse.linalg as linalg
 from deep_learning import variational_auto_encoder
-from deep_learning import mcvae
 
 
 class DeepLatentReconstruction:
@@ -66,7 +65,7 @@ class DeepLatentReconstruction:
         )
         return np.real(signal)
 
-    def mr_step_subsampled(self, x_mr, mr_decoded, mu):
+    def mr_step_subsampled(self, x_mr, mr_decoded, mu, maxiter=None):
         partial_A = partial(self.apply_A_on_flattened, x_mr.shape)
         A = linalg.LinearOperator((x_mr.size, x_mr.size), matvec=partial_A)
         b = np.real(ifft2(self.y_mr)) + self.rho_mr * (mr_decoded - mu)
@@ -74,7 +73,7 @@ class DeepLatentReconstruction:
         b_flat = b.ravel()
         x_flat = x_mr.ravel()
 
-        x_flat, _ = linalg.cg(A, b_flat, x0=x_flat)
+        x_flat, _ = linalg.cg(A, b_flat, x0=x_flat, maxiter=maxiter)
         return x_flat.reshape(x_mr.shape)
 
     def z_step(self, z, x, mu):
@@ -489,12 +488,12 @@ class DeepLatentReconstruction:
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
 
-        _, axes = plt.subplots(1, 2, figsize=(10, 5))
-        ind = 0
-        im1 = axes[0].imshow(decoded[:, :, ind])
-        im2 = axes[1].imshow(x[:, :, ind])
-        plt.colorbar(im2,ax=axes[1])
-        plt.show()
+        # _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        # ind = 0
+        # im1 = axes[0].imshow(decoded[:, :, ind])
+        # im2 = axes[1].imshow(x[:, :, ind])
+        # plt.colorbar(im2,ax=axes[1])
+        # plt.show()
 
         new_x = np.array(x[:,:,0], copy=True)
         for _ in range(1):
@@ -561,7 +560,6 @@ class DeepLatentReconstruction:
 
         x = np.expand_dims(x_pet0, axis=-1)
         mu = np.zeros_like(x)
-        print(mu.shape)
         self.rho_pet = 1 / np.sum(y_pet)
 
         # Beginning of the algorithm
@@ -577,22 +575,17 @@ class DeepLatentReconstruction:
         decoded = self.decoding(z)
         self.correction_mean, self.correction_std = self.compute_correction(x, decoded)
         decoded = self.correction_std * decoded + self.correction_mean
-
-        _, axes = plt.subplots(1, 2, figsize=(10, 5))
-        ind = 0
-        im1 = axes[0].imshow(decoded[:, :, ind])
-        im2 = axes[1].imshow(x[:, :, ind])
-        plt.colorbar(im2,ax=axes[1])
-        plt.show()
+        # _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        # ind = 0
+        # im1 = axes[0].imshow(decoded[:, :, ind])
+        # im2 = axes[1].imshow(x[:, :, ind])
+        # plt.colorbar(im2,ax=axes[1])
+        # plt.show()
 
         new_x = np.array(x[:,:,0], copy=True)
-        print(new_x.shape)
-        print(decoded[:,:,0].shape)
-        print(mu[...,0].shape)
-        new_x = self.mr_step_subsampled(new_x, decoded[:,:,0], mu[...,0])
+        new_x = self.mr_step_subsampled(new_x, decoded[:,:,0], mu[...,0], maxiter=100)
         new_x = np.expand_dims(new_x, axis=-1)
 
-        print("z_step")
         new_z = self.z_step(z, new_x, mu)
         new_decoded = self.decoding(new_z)
         new_mean, new_std = self.compute_correction(new_x, new_decoded)
@@ -651,7 +644,7 @@ class DeepLatentReconstruction:
 
         x = np.expand_dims(x_mr0, axis=-1)
         mu = np.zeros_like(x)
-        self.rho_mr = 1 / np.sum(y_mr)
+        self.rho_mr = 1 / np.real(np.sum(y_mr))
 
         # Beginning of the algorithm
         for _ in range(self.nb_steps):

@@ -212,6 +212,21 @@ def get_matching_pairs(dicomdir_path: str) -> pd.DataFrame:
 
 
 def make_image_set(pairs_df: pd.DataFrame) -> np.ndarray:
+    """Creates a numpy array with PET/MR concatenated
+    along the last dimension
+
+    Parameters
+    ----------
+    pairs_df : pd.DataFrame
+        Dataframe containing a list of PET path with their corresponding
+    MR image path
+
+    Returns
+    -------
+    np.ndarray
+        Complete
+
+    """
     images = []
     for _, row in pairs_df.iterrows():
         pet = dcmread(row["path"]).pixel_array
@@ -224,6 +239,16 @@ def make_image_set(pairs_df: pd.DataFrame) -> np.ndarray:
 
 
 def create_patient_dicomdir(path: str) -> None:
+    """Creates the DICOMDIR file for a given patient
+
+    Parameters
+    ----------
+    path : str
+        path to the patient folder with pet and mr sub folders
+
+    """
+    if (pathlib.Path(path) / "DICOMDIR").exists():
+        return
     p = pathlib.Path(path).rglob("*.dcm")
     files = [x for x in p if x.is_file()]
     fs = FileSet()
