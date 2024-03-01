@@ -364,3 +364,79 @@ def normalize(a, axis=None) -> np.ndarray:
     mini = np.min(a, axis=axis, keepdims=True)
     maxi = np.max(a, axis=axis, keepdims=True)
     return (a - mini) / (maxi - mini)
+
+
+def mr_forward_opp(mri_subsampling):
+    def forward(x):
+        return mri_subsampling(fft2(x))
+
+    return forward
+
+
+def mr_backward_opp():
+    def forward(x):
+        return np.real(ifft2(x))
+
+    return forward
+
+
+def proj_l2(g, Lambda=1.0):
+    '''
+    Proximal operator of the L2,1 norm :
+        L2,1(u) = sum_i ||u_i||_2
+    i.e pointwise projection onto the L2 unit ball
+
+    g : gradient-like numpy array
+    Lambda : magnitude of the unit ball
+    '''
+    res = np.copy(g)
+    n = np.maximum(np.sqrt(np.sum(g**2, 0))/Lambda, 1.0)
+    res[0] /= n
+    res[1] /= n
+    return res
+
+
+def norm2sq(mat):
+    return np.dot(mat.ravel(), mat.ravel())
+
+
+def norm1(mat):
+    return np.sum(np.abs(mat))
+
+
+def power_method(P, PT, data, n_it=10):
+    '''
+    Calculates the norm of operator K = [grad, P],
+    i.e the sqrt of the largest eigenvalue of K^T*K = -div(grad) + P^T*P :
+        ||K|| = sqrt(lambda_max(K^T*K))
+
+    P : forward projection
+    PT : back projection
+    data : acquired sinogram
+    '''
+    x = PT(data)
+    for _ in range(n_it):
+        x = PT(P(x)) - div_2d(list(gradient(x)))
+        s = np.sqrt(norm2sq(x))
+        x /= s
+    return np.sqrt(s)
+
+
+def psnr(ref, denoised, data_range=1):
+  """
+  Compute the peak signal-to-noise ratio (PSNR) between two images.
+
+  Args:
+    ref: The reference image.
+    denoised: The denoised image.
+    data_range: max - min value of the image
+
+  Returns:
+    The PSNR in dB.
+  """
+  mse = np.mean((ref - denoised) ** 2)
+  if mse == 0:
+    return np.inf
+  max_pixel_value = data_range
+  psnr = 20 * np.log10(max_pixel_value / np.sqrt(mse))
+  return psnr

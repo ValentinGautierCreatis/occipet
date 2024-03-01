@@ -579,11 +579,11 @@ class DeepLatentReconstruction:
         # ind = 0
         # im1 = axes[0].imshow(decoded[:, :, ind])
         # im2 = axes[1].imshow(x[:, :, ind])
-        # plt.colorbar(im2,ax=axes[1])
+        # plt.colorbar(im2,ax=axes[0])
         # plt.show()
 
         new_x = np.array(x[:,:,0], copy=True)
-        new_x = self.mr_step_subsampled(new_x, decoded[:,:,0], mu[...,0], maxiter=100)
+        new_x = self.mr_step_subsampled(new_x, decoded[:,:,0], mu[...,0], maxiter=1)
         new_x = np.expand_dims(new_x, axis=-1)
 
         new_z = self.z_step(z, new_x, mu)
@@ -644,7 +644,7 @@ class DeepLatentReconstruction:
 
         x = np.expand_dims(x_mr0, axis=-1)
         mu = np.zeros_like(x)
-        self.rho_mr = 1 / np.real(np.sum(y_mr))
+        self.rho_mr = 1 / np.real(np.sum(np.abs(y_mr)))
 
         # Beginning of the algorithm
         for _ in range(self.nb_steps):

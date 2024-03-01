@@ -232,6 +232,46 @@ def EMTV(y: np.ndarray, image_shape: np.ndarray,
     return image
 
 
+def chambolle_pock(P, PT, data, Lambda, L,  n_it, return_energy=True):
+    '''
+    Chambolle-Pock algorithm for the minimization of the objective function
+        ||P*x - d||_2^2 + Lambda*TV(x)
+
+    P : projection operator
+    PT : backprojection operator
+    Lambda : weight of the TV penalization (the higher Lambda, the more sparse is the solution)
+    L : norm of the operator [P, Lambda*grad] (see power_method)
+    n_it : number of iterations
+    return_energy: if True, an array containing the values of the objective function will be returned
+    '''
+
+    sigma = 1.0/L
+    tau = 1.0/L
+
+    x = 0*PT(data)
+    p = 0*gradient(x)
+    q = 0*data
+    x_tilde = 0*x
+    theta = 1.0
+
+    if return_energy: en = np.zeros(n_it)
+    for k in range(0, n_it):
+        # Update dual variables
+        p = proj_l2(p + sigma*gradient(x_tilde), Lambda)
+        q = (q + sigma*P(x_tilde) - sigma*data)/(1.0 + sigma)
+        # Update primal variables
+        x_old = x
+        x = x + tau*div_2d(list(p)) - tau*PT(q)
+        x_tilde = x + theta*(x - x_old)
+        # Calculate norms
+        if return_energy:
+            fidelity = 0.5*norm2sq(P(x)-data)
+            tv = norm1(gradient(x))
+            energy = 1.0*fidelity + Lambda*tv
+            en[k] = energy
+    else: return x
+
+
 def merhanian_joint_pet_mr(rho_u: float, rho_v: float, lambda_u: float, lambda_v: float,
                            sigma: float,
                            pet_number_iterations: int, mr_number_iterations: int,
