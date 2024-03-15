@@ -332,6 +332,7 @@ class DeepLatentReconstruction:
         eps_rel,
     ):
         # Initializations
+        zs = []
         self.optimizer = tf.keras.optimizers.Adam(0.05)
         self.nb_steps = nb_steps
         self.step_size = step_size
@@ -363,10 +364,11 @@ class DeepLatentReconstruction:
         # Beginning of the algorithm
         for _ in range(self.nb_steps):
             x, mu, z, stop = self.reconstruction_step(x, mu, z)
+            zs.append(z.numpy())
             if stop:
                 break
 
-        return x
+        return x, np.array(np.squeeze(zs))
 
     def pet_reconstruction_metrics(
         self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
@@ -653,4 +655,119 @@ class DeepLatentReconstruction:
             if stop:
                 break
 
-        return x
+        return x, z
+
+
+    def denoising_step(self, noisy_image, decoded, mu, rho):
+        gamma = decoded - mu
+        return (gamma + noisy_image)/(rho + 1)
+
+
+    def mnist_step(self,noisy_x, mu, z):
+        decoded = self.decoding(z)
+        self.correction_mean, self.correction_std = self.compute_correction(noisy_x, decoded)
+        decoded = self.correction_std * decoded + self.correction_mean
+        # _, axes = plt.subplots(1, 2, figsize=(10, 5))
+        # ind = 0
+        # im1 = axes[0].imshow(decoded[:, :, ind])
+        # im2 = axes[1].imshow(x[:, :, ind])
+        # plt.colorbar(im2,ax=axes[1])
+        # plt.show()
+
+        # PET STEP
+        new_x_1 = self.denoising_step(noisy_x[...,0], decoded[:, :, 0], mu[:, :, 0], self.rho_pet)
+
+        # MR STEP
+        # new_x_mr = self.mr_step(decoded[:, :, 1], mu[:, :, 1])
+        new_x_2 = self.denoising_step(noisy_x[...,1], decoded[:, :, 1], mu[:, :, 1], self.rho_mr)
+        # new_x_mr = x[:,:,1]
+
+        new_x = np.concatenate(
+            (np.expand_dims(new_x_1, axis=-1), np.expand_dims(new_x_2, axis=-1)),
+            axis=-1,
+        )
+
+        # Z STEP
+        new_z = self.z_step(z, new_x, mu)
+        new_decoded = self.decoding(new_z)
+        new_mean, new_std = self.compute_correction(new_x, new_decoded)
+        new_decoded = new_mean + new_decoded * new_std
+
+        # LAGRANGIAN STEP
+        new_mu = self.lagrangian_step(new_x, mu, new_decoded)
+
+        # RESIDUALS
+        norm_primal_pet, norm_dual_pet = self.compute_residuals(
+            new_x[:, :, 0], new_mu[:, :, 0], new_decoded[:, :, 0], decoded[:, :, 0]
+        )
+        norm_primal_mr, norm_dual_mr = self.compute_residuals(
+            new_x[:, :, 1], new_mu[:, :, 1], new_decoded[:, :, 1], decoded[:, :, 1]
+        )
+
+        # TAU UPDATE
+        self.tau_pet = self.tau_update(norm_primal_pet, norm_dual_pet)
+        self.tau_mr = self.tau_update(norm_primal_mr, norm_dual_mr)
+
+        # RHO UPDATE
+        update_factor_pet = self.compute_splitted_rho_update_factor(
+            norm_primal_pet, norm_dual_pet, self.tau_pet
+        )
+
+        update_factor_mr = self.compute_splitted_rho_update_factor(
+            norm_primal_mr, norm_dual_mr, self.tau_mr
+        )
+        self.rho_pet = self.rho_pet * update_factor_pet
+        self.rho_mr = self.rho_mr * update_factor_mr
+
+        # new_mu = new_mu / np.array([update_factor_pet, update_factor_mr])
+        new_mu[:, :, 0] = new_mu[:, :, 0] / update_factor_pet
+        new_mu[:, :, 1] = new_mu[:, :, 1] / update_factor_mr
+
+        stop = False
+        if (
+            norm_primal_pet <= self.eps_rel
+            and norm_dual_pet <= self.eps_rel
+            and norm_primal_mr <= self.eps_rel
+            and norm_dual_mr <= self.eps_rel
+        ):
+            stop = True
+
+        return new_x, new_mu, new_z, stop
+
+
+    def mnist_denoising(
+        self,
+        noisy_x_1,
+        noisy_x_2,
+        nb_steps,
+        eps_rel,
+    ):
+        # Initializations
+        zs = []
+        self.optimizer = tf.keras.optimizers.Adam(0.05)
+        self.nb_steps = nb_steps
+        self.eps_rel = eps_rel
+        x_1_standardized = (noisy_x_1 - noisy_x_1.mean()) / noisy_x_1.std()
+        x_2_standardized = (noisy_x_2 - noisy_x_2.mean()) / noisy_x_2.std()
+        x0_standardized = np.concatenate(
+            (
+                np.expand_dims(x_1_standardized, axis=-1),
+                np.expand_dims(x_2_standardized, axis=-1),
+            ),
+            axis=-1,
+        )
+        z, *_ = self.autoencoder.encode(np.expand_dims(x0_standardized, axis=0))
+        z = tf.Variable(z, trainable=True)
+
+        mu = np.zeros_like(x0_standardized)
+        self.rho_pet = 1 / np.sum(np.abs(x0_standardized))
+        self.rho_mr = self.rho_pet
+
+        # Beginning of the algorithm
+        for _ in range(self.nb_steps):
+            x, mu, z, stop = self.mnist_step(x0_standardized, mu, z)
+            zs.append(z.numpy())
+            if stop:
+                break
+
+        return x, np.array(np.squeeze(zs))
