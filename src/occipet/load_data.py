@@ -3,6 +3,7 @@ Module used to load data
 """
 
 import nibabel as nib
+import SimpleITK as sitk
 import numpy as np
 import brainweb
 import pathlib
@@ -256,3 +257,46 @@ def create_patient_dicomdir(path: str) -> None:
         fs.add(str(f))
 
     fs.write(str(path))
+
+
+def resample(image: sitk.Image, reference_image: sitk.Image) -> sitk.Image:
+    out = sitk.Resample(image,
+                         reference_image,
+                         defaultPixelValue = 0.0)
+    return out
+
+
+def get_image(path: str):  # assumes that you want the series of the alphatically first entry in path
+
+    file_name = str(list(pathlib.Path(path).iterdir())[0])
+    data_directory = path
+
+    # The block below matches all images in path with the same Series Instance UID as the first entry
+    # Alternatively, this can be replaced by any other method producing a list of file names
+    file_reader = sitk.ImageFileReader()
+    file_reader.SetFileName(str(file_name))
+    file_reader.ReadImageInformation()
+    series_ID = file_reader.GetMetaData('0020|000e')  # This gets the DICOM tag 0x0020000E (Series Instance UID)
+    sorted_file_names = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(data_directory, series_ID)
+
+    img = sitk.ReadImage(sorted_file_names)
+    return img
+
+
+def read_patient(patient_path: str):
+    '''Read out pet and t1 from patient_path, resample one to the other
+
+    :param patient_path: str: patient folder name
+    :return: (Pet np.ndarray, T1 np.ndarray, resampled image np.ndarray
+    '''
+    img_pet = get_image(f'{patient_path}/pet')
+    img_tone = get_image(f'{patient_path}/T1')
+
+    resam = resample(img_tone, img_pet)  # The first image gets resampled, the second one provides the reference spacing, orientation, etc.
+
+    # return images as numpy arrays, this can be replaced if you want to work in .nii, .mha, or other formats
+    # in that case, use sitk.WriteImage(image: sitk.Image, filename: str)
+    resampled_arr = sitk.GetArrayFromImage(resam)
+    img_pet_arr = sitk.GetArrayFromImage(img_pet)
+    img_tone_arr = sitk.GetArrayFromImage(img_tone)
+    return img_pet_arr, img_tone_arr, resampled_arr

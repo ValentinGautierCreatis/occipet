@@ -364,11 +364,11 @@ class DeepLatentReconstruction:
         # Beginning of the algorithm
         for _ in range(self.nb_steps):
             x, mu, z, stop = self.reconstruction_step(x, mu, z)
-            zs.append(z.numpy())
+            # zs.append(z.numpy())
             if stop:
                 break
 
-        return x, np.array(np.squeeze(zs))
+        return x#, np.array(np.squeeze(zs))
 
     def pet_reconstruction_metrics(
         self, x_pet0, ref_pet, ref_mr, y_pet, projector_id, step_size, nb_steps, eps_rel
