@@ -95,6 +95,15 @@ class Vae1_2(tf.keras.Model):
         )
         return reconstructed
 
+    def encode(self, x):
+        return self.encoder(x)
+
+    def decode(self, z):
+        reconstructed = tf.concat(
+            [self.decoders[0](z), self.decoders[1](z)], axis=-1
+        )
+        return reconstructed
+
     def train_step(self, data):
         with tf.GradientTape() as tape:
             x, _ = data

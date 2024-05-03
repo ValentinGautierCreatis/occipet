@@ -83,7 +83,10 @@ class DeepLatentReconstruction:
             )
             new_image = (x + mu) - decoded
             squared = tf.math.square(new_image)
-            return squared
+            squared_z = tf.math.square(z)
+            total = tf.reduce_sum(squared) + 0.5 * tf.reduce_sum(squared_z)
+
+            return total
 
         self.optimizer.minimize(f, [z])
         return z
