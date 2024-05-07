@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
@@ -139,16 +140,14 @@ class mmJSD(tf.keras.Model):
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.elbo_poe_tracker = keras.metrics.Mean(name="elbo_poe")
         self.jensen_tracker = keras.metrics.Mean(name="jensen")
-        self.reconstruction1_tracker = keras.metrics.Mean(name="reconstruction1")
-        self.reconstruction2_tracker = keras.metrics.Mean(name="reconstruction2")
         self.reconstruction_poe_tracker = keras.metrics.Mean(name="reconstruction_poe")
 
-    def poe(self, mean1, mean2, log_var1, log_var2):
-        T1 = tf.math.exp(-log_var1)
-        T2 = tf.math.exp(-log_var2)
-        log_var = -tf.math.log(T1 + T2)
+    def poe(self, means, log_vars):
+        Ts = [tf.math.exp(-lv) for lv in log_vars]
+        log_var = -tf.math.log(sum(Ts))
 
-        mean = (T1 * mean1 + T2 * mean2) * tf.exp(log_var)
+        mean_numerator = sum([Ti * mean_i for (Ti,mean_i) in zip(Ts, means)])
+        mean = mean_numerator * tf.math.exp(log_var)
 
         return mean, log_var
 
@@ -156,7 +155,9 @@ class mmJSD(tf.keras.Model):
         mean1, log_var1, z1 = self.vaes[0].encode(x[..., :1])
         mean2, log_var2, z2 = self.vaes[1].encode(x[..., :-1])
 
-        mean, log_var = self.poe(mean1, mean2, log_var1, log_var2)
+        # mean, log_var = self.poe(mean1, mean2, log_var1, log_var2)
+        # mean, log_var = self.poe(mean, tf.zeros_like(mean), log_var, tf.zeros_like(log_var))
+        mean, log_var = self.poe([mean1, mean2], [log_var1, log_var2])
         z = Sampling()((mean, log_var))
 
         return mean1, log_var1, z1, mean2, log_var2, z2, mean, log_var, z
@@ -185,10 +186,13 @@ class mmJSD(tf.keras.Model):
         return loss
 
 
-    def jensen_loss(self, mean1, log_var1, mean2, log_var2, mean_poe, log_var_poe):
-        kl1 = self.kl_loss(mean1, log_var1, mean_poe, log_var_poe)
-        kl2 = self.kl_loss(mean2, log_var2, mean_poe, log_var_poe)
-        kl_prior = self.kl_loss(tf.zeros_like(mean1), tf.zeros_like(log_var1), mean_poe, log_var_poe)
+    def jensen_loss(self, mean1, log_var1, mean2, log_var2, mean_prior, log_var_prior):
+
+        mean_dynamic_prior, log_var_dynamic_prior = self.poe([mean1, mean2, mean_prior], [log_var1, log_var2, log_var_prior])
+
+        kl1 = self.kl_loss(mean1, log_var1, mean_dynamic_prior, log_var_dynamic_prior)
+        kl2 = self.kl_loss(mean2, log_var2, mean_dynamic_prior, log_var_dynamic_prior)
+        kl_prior = self.kl_loss(mean_prior, log_var_prior, mean_dynamic_prior, log_var_dynamic_prior)
         return kl1 + kl2 + kl_prior
 
 
@@ -198,16 +202,18 @@ class mmJSD(tf.keras.Model):
         x2 = x[...,:-1]
         with tf.GradientTape(persistent=True) as tape:
             z_mean1, z_log_var1, z1, z_mean2, z_log_var2, z2, z_mean, z_log_var, z = self.encode(x)
+            mean_prior = tf.zeros_like(z_mean)
+            log_var_prior = tf.zeros_like(z_log_var)
 
             decoded_poe = self.decode(z)
-            decoded1 = self.decode(z1)
-            decoded2 = self.decode(z2)
+            # decoded1 = self.decode(z1)
+            # decoded2 = self.decode(z2)
 
-            reconstruction1 = self.reconstruction_loss(decoded1, x1)
-            reconstruction2 = self.reconstruction_loss(decoded2, x2)
+            # reconstruction1 = self.reconstruction_loss(decoded1, x1)
+            # reconstruction2 = self.reconstruction_loss(decoded2, x2)
             reconstruction_poe = self.reconstruction_loss(decoded_poe, x)
 
-            jensen = self.jensen_loss(z_mean1, z_log_var1, z_mean2, z_log_var2, z_mean, z_log_var)
+            jensen = self.jensen_loss(z_mean1, z_log_var1, z_mean2, z_log_var2, mean_prior, log_var_prior)
 
             loss_poe = reconstruction_poe + self.beta * jensen
 
@@ -218,15 +224,11 @@ class mmJSD(tf.keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.elbo_poe_tracker.update_state(loss_poe)
-        self.reconstruction1_tracker.update_state(reconstruction1)
-        self.reconstruction2_tracker.update_state(reconstruction2)
         self.jensen_tracker.update_state(jensen)
         self.reconstruction_poe_tracker.update_state(reconstruction_poe)
 
         return {
             "elbo_poe": self.elbo_poe_tracker.result(),
-            "reconstruction1": self.reconstruction1_tracker.result(),
-            "reconstruction2": self.reconstruction2_tracker.result(),
             "reconstruction_poe": self.reconstruction_poe_tracker.result(),
             "jensen": self.jensen_tracker.result(),
             "total_loss": self.total_loss_tracker.result()

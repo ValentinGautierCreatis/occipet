@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
@@ -137,22 +138,16 @@ class MVAE(tf.keras.Model):
         self.nb_modalities = original_shape[-1]
         self.vaes = [Vae(tuple(original_shape[:-1])+(1,), latent_dim, beta, name) for _ in range(self.nb_modalities)]
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
-        self.elbo1_tracker = keras.metrics.Mean(name="elbo1")
-        self.elbo2_tracker = keras.metrics.Mean(name="elbo2")
         self.elbo_poe_tracker = keras.metrics.Mean(name="elbo_poe")
-        self.kl1_tracker = keras.metrics.Mean(name="kl1")
-        self.kl2_tracker = keras.metrics.Mean(name="kl2")
         self.kl_poe_tracker = keras.metrics.Mean(name="kl_poe")
-        self.reconstruction1_tracker = keras.metrics.Mean(name="reconstruction1")
-        self.reconstruction2_tracker = keras.metrics.Mean(name="reconstruction2")
         self.reconstruction_poe_tracker = keras.metrics.Mean(name="reconstruction_poe")
 
-    def poe(self, mean1, mean2, log_var1, log_var2):
-        T1 = tf.math.exp(-log_var1)
-        T2 = tf.math.exp(-log_var2)
-        log_var = -tf.math.log(T1 + T2)
+    def poe(self, means, log_vars):
+        Ts = [tf.math.exp(-lv) for lv in log_vars]
+        log_var = -tf.math.log(sum(Ts))
 
-        mean = (T1 * mean1 + T2 * mean2) * tf.exp(log_var)
+        mean_numerator = sum([Ti * mean_i for (Ti,mean_i) in zip(Ts, means)])
+        mean = mean_numerator * tf.math.exp(log_var)
 
         return mean, log_var
 
@@ -160,7 +155,9 @@ class MVAE(tf.keras.Model):
         mean1, log_var1, z1 = self.vaes[0].encode(x[..., :1])
         mean2, log_var2, z2 = self.vaes[1].encode(x[..., :-1])
 
-        mean, log_var = self.poe(mean1, mean2, log_var1, log_var2)
+        # mean, log_var = self.poe(mean1, mean2, log_var1, log_var2)
+        # mean, log_var = self.poe(mean, tf.zeros_like(mean), log_var, tf.zeros_like(log_var))
+        mean, log_var = self.poe([mean1, mean2, tf.zeros_like(mean1)], [log_var1, log_var2, tf.zeros_like(log_var1)])
         z = Sampling()((mean, log_var))
 
         return mean1, log_var1, z1, mean2, log_var2, z2, mean, log_var, z
@@ -195,47 +192,35 @@ class MVAE(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             z_mean1, z_log_var1, z1, z_mean2, z_log_var2, z2, z_mean, z_log_var, z = self.encode(x)
 
+            decoded_1 = self.decode(z1)
+            decoded_2 = self.decode(z2)
             decoded_poe = self.decode(z)
-            decoded1 = self.decode(z1)
-            decoded2 = self.decode(z2)
 
-            reconstruction1 = self.reconstruction_loss(decoded1, x1)
-            reconstruction2 = self.reconstruction_loss(decoded2, x2)
+            reconstruction_1 = self.reconstruction_loss(decoded_1, x)
+            reconstruction_2 = self.reconstruction_loss(decoded_2, x)
             reconstruction_poe = self.reconstruction_loss(decoded_poe, x)
 
-            kl1 = self.kl_loss(z_mean1, z_log_var1)
-            kl2 = self.kl_loss(z_mean2, z_log_var2)
+            kl_1 = self.kl_loss(z1, z_log_var1)
+            kl_2 = self.kl_loss(z2, z_log_var2)
             kl_poe = self.kl_loss(z_mean, z_log_var)
 
+            loss_1 = reconstruction_1 + self.beta * kl_1
+            loss_2 = reconstruction_2 + self.beta * kl_2
             loss_poe = reconstruction_poe + self.beta * kl_poe
-            loss1 = reconstruction1 + self.beta * kl1
-            loss2 = reconstruction2 + self.beta * kl2
 
-            total_loss = loss_poe# + loss1 + loss2
+            total_loss = loss_poe + loss_1 + loss_2
 
         grads = tape.gradient(total_loss, self.trainable_weights)
 
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
-        self.elbo1_tracker.update_state(loss1)
-        self.elbo2_tracker.update_state(loss2)
         self.elbo_poe_tracker.update_state(loss_poe)
-        self.kl1_tracker.update_state(kl1)
-        self.kl2_tracker.update_state(kl2)
         self.kl_poe_tracker.update_state(kl_poe)
-        self.reconstruction1_tracker.update_state(reconstruction1)
-        self.reconstruction2_tracker.update_state(reconstruction2)
         self.reconstruction_poe_tracker.update_state(reconstruction_poe)
 
         return {
-            "elbo1": self.elbo1_tracker.result(),
-            "elbo2": self.elbo2_tracker.result(),
             "elbo_poe": self.elbo_poe_tracker.result(),
-            "kl1": self.kl1_tracker.result(),
-            "kl2": self.kl2_tracker.result(),
             "kl_poe": self.kl_poe_tracker.result(),
-            "reconstruction1": self.reconstruction1_tracker.result(),
-            "reconstruction2": self.reconstruction2_tracker.result(),
             "reconstruction_poe": self.reconstruction_poe_tracker.result(),
             "total_loss": self.total_loss_tracker.result()
         }
