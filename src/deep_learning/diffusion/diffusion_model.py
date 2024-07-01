@@ -7,6 +7,29 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from occipet.utils import mr_forward_opp, mr_backward_opp, back_projection, forward_projection
+
+
+class GradientPet:
+    def __init__(self, y_pet, projector_id):
+        self.y_pet = y_pet
+        self.projector_id = projector_id
+
+    def __call__(self, x):
+        _, sensitivity = back_projection(np.ones(self.y_pet.shape), self.projector_id)
+        _, x_proj = forward_projection(x, self.projector_id)
+        ratio = self.y_pet/x_proj
+        _, res = back_projection(ratio , self.projector_id)
+        return res - sensitivity
+
+class GradientMR:
+    def __init__(self, y_mr, subsampling):
+        self.y_mr = y_mr
+        self.forward = mr_forward_opp(subsampling)
+        self.backward = mr_backward_opp()
+
+    def __call__(self, x):
+        return (self.backward(self.forward(x)) - self.backward(self.y_mr)).astype(np.float32)
 
 
 class DiffusionModel(keras.Model):
@@ -153,29 +176,24 @@ class DiffusionModelBrain(DiffusionModel):
     def __init__(self, network, ema_network, timesteps, gdf_util, ema=0.999, img_size=64, img_channels=2):
         super().__init__(network, ema_network, timesteps, gdf_util, ema, img_size, img_channels)
 
-    def generate_images_dps_brain(self, y_pet, y_mr, num_images=16, eta=0.02):
+    def generate_images_dps_brain(self, num_images=16, eta=0.02):
         # 1. Randomly sample noise (starting point for reverse process)
         samples = tf.random.normal(
             shape=(num_images, self.img_size, self.img_size, self.img_channels), dtype=tf.float32
         )
         # 2. Sample from the model iteratively
         for t in reversed(range(0, self.timesteps)):
-            print("sampling")
             tt = tf.cast(tf.fill(num_images, t), dtype=tf.int64)
-            print("pred noise")
             pred_noise = self.ema_network.predict(
                 [samples, tt], verbose=0, batch_size=num_images
             )
-            print("x0")
             x0 = self.gdf_util.predict_start_from_noise(samples, tt, pred_noise)
-            print("samples")
             samples = self.gdf_util.p_sample(
                 pred_noise, samples, tt, clip_denoised=False
             )
             #DPS
-            print("grad pet")
-            grad_pet = tf.expand_dims(self.f_grad_pet(x0[...,0], y_pet), axis=-1)
-            grad_mr = tf.expand_dims(self.f_grad_mr(x0[...,1], y_mr), axis=-1)
+            grad_pet = tf.expand_dims(self.f_grad_pet(x0[0,...,0].numpy()), axis=-1)
+            grad_mr = tf.expand_dims(self.f_grad_mr(x0[0,...,1].numpy()), axis=-1)
 
             grad = tf.concat([grad_pet, grad_mr], axis=-1)
             samples = samples - eta*grad
