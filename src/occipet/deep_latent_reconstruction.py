@@ -19,7 +19,8 @@ class DeepLatentReconstruction:
         self, autoencoder: variational_auto_encoder.VariationalAutoEncoder
     ) -> None:
         self.autoencoder = autoencoder
-        self.xi = 1
+        # self.xi = 1
+        self.xi = 0.5
         self.u = 10
         self.tau = 1
         self.tau_pet = 1
@@ -83,8 +84,8 @@ class DeepLatentReconstruction:
             )
             new_image = (x + mu) - decoded
             squared = tf.math.square(new_image)
-            # squared_z = tf.math.square(z)
-            total = tf.reduce_sum(squared)# + 0.5 * tf.reduce_sum(squared_z)
+            squared_z = tf.math.square(z)
+            total = tf.reduce_sum(squared) + 0.5 * tf.reduce_sum(squared_z)
 
             return total
 
@@ -336,7 +337,8 @@ class DeepLatentReconstruction:
     ):
         # Initializations
         zs = []
-        self.optimizer = tf.keras.optimizers.Adam(0.05)
+        # self.optimizer = tf.keras.optimizers.Adam(0.05)
+        self.optimizer = tf.keras.optimizers.Adam(0.33)
         self.nb_steps = nb_steps
         self.step_size = step_size
         self.y_pet = y_pet

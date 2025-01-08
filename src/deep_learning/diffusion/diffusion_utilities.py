@@ -162,7 +162,7 @@ class GaussianDiffusion:
         )
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
-    def p_mean_variance(self, pred_noise, x, t, clip_denoised=True):
+    def p_mean_variance(self, pred_noise, x, t, clip_denoised=False):
         x_recon = self.predict_start_from_noise(x, t=t, noise=pred_noise)
         if clip_denoised:
             x_recon = tf.clip_by_value(x_recon, self.clip_min, self.clip_max)
