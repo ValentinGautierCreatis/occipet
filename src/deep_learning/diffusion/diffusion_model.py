@@ -224,6 +224,16 @@ class DiffusionModelBrain(DiffusionModel):
         return samples
 
 
+class LatentDiffusionModelBrain(DiffusionModel):
+    def __init__(self, vae, network, ema_network, timesteps, gdf_util, ema=0.999, img_size=64, img_channels=2):
+        self.vae = vae
+        super().__init__(network, ema_network, timesteps, gdf_util, ema, img_size, img_channels)
+
+    def train_step(self, images):
+        mean, _, _ = self.vae.encode(images)
+        super().train(mean)
+
+
 class DiffusionModelMono(DiffusionModel):
     def __init__(self, network, f_grad, ema_network, timesteps, gdf_util, ema=0.999, img_size=64, img_channels=2):
         self.f_grad = f_grad
