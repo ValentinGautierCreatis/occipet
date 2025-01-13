@@ -309,13 +309,13 @@ class Decoder(layers.Layer):
 
 
 class Vae(tf.keras.Model):
-    def __init__(self, original_shape=(256,256,2), latent_dim=2, beta=1.0, sparse=False, name="vae", **kwargs):
+    def __init__(self, img_size=(256,256,2), latent_dim=2, beta=1.0, sparse=False, name="vae", **kwargs):
         super(Vae, self).__init__(name=name, **kwargs)
         self.beta = beta
         self.encoder = Encoder(latent_dim=latent_dim)
-        self.original_shape = original_shape
-        self.encoder.compute_output_shape((None,) + tuple(original_shape))
-        self.decoder = Decoder(latent_dim, original_shape[-1])
+        self.img_size = img_size
+        self.encoder.compute_output_shape((None,) + tuple(img_size))
+        self.decoder = Decoder(latent_dim, img_size[-1])
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
@@ -339,7 +339,7 @@ class Vae(tf.keras.Model):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             # data = tf.convert_to_tensor(data)
-            x, _ = data
+            x = data
             z_mean, z_log_var, z = self.encoder(x)
             reconstruction = self.decoder(z)
 
