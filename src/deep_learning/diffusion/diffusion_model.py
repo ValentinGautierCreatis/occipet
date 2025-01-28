@@ -232,7 +232,7 @@ class LatentDiffusionModelBrain(DiffusionModel):
 
     def train_step(self, images):
         mean, _, _ = self.vae.encode(images)
-        super().train(mean)
+        super().train_step(mean)
 
 
 class DiffusionModelMono(DiffusionModel):
