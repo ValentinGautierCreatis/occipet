@@ -321,7 +321,7 @@ class Decoder(layers.Layer):
 
 class Vae(tf.keras.Model):
     def __init__(self, img_size=(256,256,2), latent_dim=2, beta=1.0, sparse=False, name="vae", **kwargs):
-        super(Vae, self).__init__(name=name, **kwargs)
+        super().__init__(name=name, **kwargs)
         self.beta = beta
         self.encoder = Encoder(latent_dim=latent_dim)
         self.img_size = img_size
