@@ -75,7 +75,6 @@ class DiffusionModel(keras.Model):
 
             # 5. Pass the diffused images and time steps to the network
             pred_noise = self.network([images_t, t], training=True)
-            print(pred_noise.shape)
 
             # 6. Calculate the loss
             loss = self.loss(noise, pred_noise)
