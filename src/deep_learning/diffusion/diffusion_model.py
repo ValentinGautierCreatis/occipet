@@ -226,8 +226,8 @@ class DiffusionModelBrain(DiffusionModel):
 
 class LatentDiffusionModelBrain(DiffusionModel):
     def __init__(self, vae, network, ema_network, timesteps, gdf_util, ema=0.999, img_size=64, img_channels=2):
-        self.vae = vae
-        self.vae.trainable = False
+        # self.vae = vae
+        # self.vae.trainable = False
         super().__init__(network, ema_network, timesteps, gdf_util, ema, img_size, img_channels)
 
     def train_step(self, images):
