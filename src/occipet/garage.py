@@ -13,6 +13,9 @@ import tensorflow as tf
 from deep_learning.variational_auto_encoder import VariationalAutoEncoder
 
 
+# USED ONLY FOR TESTING, DEPRECATED
+
+
 def dlr(
     y_pet,
     projector_id,
