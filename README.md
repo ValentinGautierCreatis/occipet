@@ -29,7 +29,7 @@ Occipet contains the code relative to the reconstruction of PET and MR images.
 
 This module is composed of many different deep learning models that are implemented as Classes. Most of them are VAEs and the submodule `diffusion` contains everything that is diffusion models related.
 
-`variational_auto_encoder.py` is the first and the simplest implementation of the tested VAEs. It is improved in `vae1_2.py` which uses one decoder per modality. `adaptive1_2.py` implements a beta-VAE with an automatic beta selection method. The implementation of this method has not been verified yet so there is no guarantee of it working properly. `test_var.py` contains some early VAE prototypes. The rest is composed of the other tested architectures. 
+`variational_auto_encoder.py` is the first and the simplest implementation of the tested VAEs. It is improved in `vae1_2.py` which uses one decoder per modality. `adaptive1_2.py` implements a beta-VAE with an automatic beta selection method. The implementation of this method has not been verified yet so there is no guarantee of it working properly. `test_vae.py` contains some early VAE prototypes. The rest is composed of the other tested architectures. 
 
 ## Installation 
 
